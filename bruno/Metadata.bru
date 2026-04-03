@@ -1,0 +1,22 @@
+meta {
+  name: Metadata
+  type: http
+  seq: 3
+}
+
+get {
+  url: http://localhost:8081/document/metadata
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id":"dc4827ad-d922-4b6b-9f6d-3d3ee99f9123"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

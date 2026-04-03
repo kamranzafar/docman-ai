@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "docman",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Content
+  type: http
+  seq: 4
+}
+
+get {
+  url: http://localhost:8081/document/content
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id":"e4bbd492-9514-456a-b98e-441eac24d347"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

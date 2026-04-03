@@ -1,0 +1,25 @@
+meta {
+  name: Ingest
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8081/document
+  body: multipartForm
+  auth: inherit
+}
+
+headers {
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  metadata: @file(metadata.json)
+  file: @file(test.txt)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,38 @@
+server:
+  port : 8081
+ssl:
+  keystore:
+    file: /Users/kamran/certs/opensearch-truststore.jks
+    password: changeit
+minio:
+  address: http://localhost:9222
+  user: minioadmin
+  password: minioadmin
+kafka:
+  address: localhost:9092
+  groupId: docman
+  topic: documents
+opensearch:
+  uris: https://localhost:9200
+  username: admin
+  password: SecureP@ssword1
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+  temporal:
+    connection:
+      target: localhost:7233
+    workers-auto-discovery:
+      packages:
+        - "org.kamranzafar.docman.wf"
+  ai:
+    ollama:
+      base-url: http://localhost:11434/
+      chat:
+        model: llama3
+        temperature: 1
+        max-file-size: -1
