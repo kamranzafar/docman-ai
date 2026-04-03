@@ -1,0 +1,28 @@
+meta {
+  name: Extract Text
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:11434/api/generate
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "model": "llama3",
+    "prompt": "Look at this base64 encoded text/plain file and extract all the text content. Provide the output as plain text, maintaining the original layout and line breaks where appropriate. Include all visible text from any included images in the file. Output only the extracted text without commentary. The contents are \"SGVsbG8gV29ybGQK\"",
+    "stream": false
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

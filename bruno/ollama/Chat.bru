@@ -1,0 +1,33 @@
+meta {
+  name: Chat
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:11434/api/chat
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "model": "llava",
+    "messages": [
+      {
+        "role": "user",
+        "content": "hello how are you?"
+      }
+    ],
+    "stream": false
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

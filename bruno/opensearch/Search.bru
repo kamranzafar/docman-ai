@@ -1,0 +1,35 @@
+meta {
+  name: Search
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://localhost:9200/document_index/_search
+  body: json
+  auth: basic
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:basic {
+  username: admin
+  password: SecureP@ssword1
+}
+
+body:json {
+  {
+    "query": {
+       "query_string": {
+         "query": "metadata.type:id*"
+       }
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
