@@ -27,4 +27,5 @@ public interface DocumentService {
     Document delete(Document document);
     Document findMetadata(UUID id);
     Document findContent(UUID id);
+    String ask(String question);
 }

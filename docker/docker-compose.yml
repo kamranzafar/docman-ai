@@ -14,6 +14,7 @@
 #  limitations under the License.
 #
 
+name: "docman-ai"
 services:
   docman-zookeeper:
     image: confluentinc/cp-zookeeper:7.4.4

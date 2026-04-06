@@ -17,9 +17,14 @@
 
 package org.kamranzafar.docman.model;
 
+import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
+@Builder
 public class DocumentSearchResponse {
-    Document document;
+    List<Document> documents;
+    String answer;
 }

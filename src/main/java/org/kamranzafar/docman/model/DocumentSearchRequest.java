@@ -17,9 +17,12 @@
 
 package org.kamranzafar.docman.model;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class DocumentSearchRequest {
     String id;
+    String question;
 }

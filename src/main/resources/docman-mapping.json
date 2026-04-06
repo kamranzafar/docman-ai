@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "content": {
+      "type": "text"
+    },
+    "metadata": {
+      "type": "object",
+      "enabled": true
+    },
+    "embedding": {
+      "type": "knn_vector",
+      "dimension": 768,
+      "method": {
+        "name": "hnsw",
+        "space_type": "cosinesimil",
+        "engine": "nmslib"
+      }
+    }
+  }
+}

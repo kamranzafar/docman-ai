@@ -20,12 +20,15 @@ package org.kamranzafar.docman.service.impl;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import io.temporal.client.WorkflowClient;
 import org.jetbrains.annotations.NotNull;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,14 +39,17 @@ import java.util.UUID;
 
 @Service
 public class DocumentServiceImpl implements DocumentService {
-    private final WorkflowClient workflowClient;
     @Autowired
     private MinioClient minioClient;
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
+    @Autowired
+    private VectorStore vectorStore;
 
-    public DocumentServiceImpl(WorkflowClient workflowClient) {
-        this.workflowClient = workflowClient;
+    private final ChatClient chatClient;
+
+    public DocumentServiceImpl(ChatClient.Builder chatClientBuilder) {
+        this.chatClient = chatClientBuilder.build();
     }
 
     @Transactional
@@ -76,7 +82,6 @@ public class DocumentServiceImpl implements DocumentService {
                     .build());
 
             document.setStatus(status);
-            document.setData(null);
 
             documentMetadataRepository.save(document);
 
@@ -114,6 +119,21 @@ public class DocumentServiceImpl implements DocumentService {
         lookupDocument(document);
 
         return document;
+    }
+
+    @Override
+    public String ask(String question) {
+        ChatResponse response = chatClient.prompt()
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
+                .user(question)
+                .call()
+                .chatResponse();
+
+        if (response != null) {
+            return response.getResult().getOutput().getText();
+        }
+
+        return null;
     }
 
     private void lookupDocument(Document document) {

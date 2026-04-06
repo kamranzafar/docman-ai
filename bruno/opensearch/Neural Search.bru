@@ -1,0 +1,35 @@
+meta {
+  name: Neural Search
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://localhost:9200/docman-vector-index/_search
+  body: json
+  auth: basic
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:basic {
+  username: admin
+  password: SecureP@ssword1
+}
+
+body:json {
+  {
+    "query": {
+       "query_string": {
+         "query": "metadata.parent_document_id:af74dcfc-4f95-44eb-9f20-9560fc894c96"
+       }
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

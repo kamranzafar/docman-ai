@@ -18,6 +18,7 @@
 package org.kamranzafar.docman;
 
 import io.minio.MinioClient;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,5 +38,10 @@ public class DocmanConfig {
                 .endpoint(minioAddress)
                 .credentials(minioUser, minioPassword)
                 .build();
+    }
+
+    @Bean
+    public TokenTextSplitter tokenTextSplitter(){
+        return new TokenTextSplitter();
     }
 }

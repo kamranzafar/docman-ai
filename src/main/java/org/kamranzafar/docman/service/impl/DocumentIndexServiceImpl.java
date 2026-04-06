@@ -20,39 +20,53 @@ package org.kamranzafar.docman.service.impl;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
-import org.kamranzafar.docman.repository.opensearch.DocumentIndexRepository;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
+import org.springframework.ai.reader.tika.TikaDocumentReader;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.List;
 
 @Slf4j
 @Service
 public class DocumentIndexServiceImpl implements DocumentIndexService {
     @Autowired
-    DocumentMetadataRepository documentMetadataRepository;
+    private DocumentMetadataRepository documentMetadataRepository;
     @Autowired
-    DocumentIndexRepository documentIndexRepository;
+    private TokenTextSplitter textSplitter;
+    @Autowired
+    VectorStore vectorStore;
 
+    @Transactional
     @Override
-    public Document index(String documentId, String content) {
-        Optional<Document> od = documentMetadataRepository.findById(UUID.fromString(documentId));
+    public void index(Document document) {
+        TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(new ByteArrayResource(document.getData()));
+        List<org.springframework.ai.document.Document> documents = tikaDocumentReader.get();
 
-        if (od.isPresent()) {
-            log.info("Indexing document with id {}", documentId);
+        if (!documents.isEmpty()) {
+            org.springframework.ai.document.Document ragDoc = documents.get(0);
 
-            Document document = od.get();
+            assert ragDoc.getMedia() != null;
+            assert ragDoc.getText() != null;
+
+            org.springframework.ai.document.Document d
+                    = new org.springframework.ai.document.Document(
+                    document.getId().toString(), ragDoc.getText(), document.getMetadata());
+
+            List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
+
+            vectorStore.add(splitDocuments);
+
+            log.info("Added Documents to Vector Store {}", vectorStore.getName());
+
             document.setStatus(DocumentStatus.INDEXED.name());
 
             documentMetadataRepository.save(document);
-            documentIndexRepository.save(document);
-
-            return document;
         }
-
-        throw new RuntimeException("Document with id " + documentId + " not found");
     }
 }

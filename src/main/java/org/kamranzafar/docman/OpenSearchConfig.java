@@ -17,71 +17,83 @@
 
 package org.kamranzafar.docman;
 
-import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
-import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager;
-import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
-import org.apache.hc.core5.ssl.SSLContextBuilder;
-import org.opensearch.client.RestClientBuilder;
-import org.opensearch.spring.boot.autoconfigure.RestClientBuilderCustomizer;
+import org.apache.http.Header;
+import org.apache.http.HttpHost;
+import org.apache.http.message.BasicHeader;
+import org.opensearch.client.RestClient;
+import org.opensearch.client.RestHighLevelClient;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.transport.rest_client.RestClientTransport;
+import org.opensearch.data.client.orhlc.AbstractOpenSearchConfiguration;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.TokenCountBatchingStrategy;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.opensearch.OpenSearchVectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
 
-import java.io.File;
-import java.io.IOException;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
+import java.net.URI;
+import java.util.Base64;
 
 @Configuration
-public class OpenSearchConfig {
+public class OpenSearchConfig extends AbstractOpenSearchConfiguration {
+    @Value("${spring.ai.vectorstore.opensearch.uris}")
+    private String uris;
 
-    @Value("${opensearch.host:localhost}")
-    private String host;
+    @Value("${spring.ai.vectorstore.opensearch.username}")
+    private String username;
 
-    @Value("${opensearch.port:9200}")
-    private int port;
+    @Value("${spring.ai.vectorstore.opensearch.password}")
+    private String password;
 
-    @Value("${opensearch.scheme:http}")
-    private String scheme;
+    @Value("${spring.ai.vectorstore.opensearch.index-name}")
+    private String indexName;
 
-    @Value("${ssl.keystore.file}")
-    private String keystoreFile;
+    @Value("classpath:docman-mapping.json")
+    private Resource resource;
 
-    @Value("${ssl.keystore.password}")
-    private String keystorePassword;
+    @Autowired
+    private EmbeddingModel embeddingModel;
 
     @Bean
-    public RestClientBuilderCustomizer customizer() {
-        return new RestClientBuilderCustomizer() {
-            @Override
-            public void customize(HttpAsyncClientBuilder builder) {
-                try {
-                    final ClientTlsStrategyBuilder tlsStrategy = ClientTlsStrategyBuilder.create()
-                            .setSslContext(SSLContextBuilder.create()
-                                    .loadKeyMaterial(new File(keystoreFile),
-                                            keystorePassword.toCharArray(), keystorePassword.toCharArray())
-                                    .build());
-
-                    final PoolingAsyncClientConnectionManager connectionManager = PoolingAsyncClientConnectionManagerBuilder
-                            .create()
-                            .setTlsStrategy(tlsStrategy.buildAsync())
-                            .build();
-
-                    builder.setConnectionManager(connectionManager);
-                } catch (final KeyManagementException | NoSuchAlgorithmException | KeyStoreException |
-                               UnrecoverableKeyException | CertificateException | IOException ex) {
-                    throw new RuntimeException("Failed to initialize SSL Context instance", ex);
-                }
-            }
-
-            @Override
-            public void customize(RestClientBuilder builder) {
-                // No additional customizations needed
-            }
-        };
+    public VectorStore vectorStore(OpenSearchClient openSearchClient, EmbeddingModel embeddingModel) {
+        return OpenSearchVectorStore.builder(openSearchClient, embeddingModel)
+                .index(indexName)                // Optional: defaults to "spring-ai-document-index"
+                .similarityFunction("l2")             // Optional: defaults to "cosinesimil"
+                .useApproximateKnn(true)              // Optional: defaults to false (exact k-NN)
+                .dimensions(1536)                     // Optional: defaults to 1536 or embedding model's dimensions
+                .initializeSchema(true)               // Optional: defaults to false
+                .batchingStrategy(new TokenCountBatchingStrategy()) // Optional: defaults to TokenCountBatchingStrategy
+                .build();
     }
+
+    @Override
+    @Bean
+    public RestHighLevelClient opensearchClient() {
+        return new RestHighLevelClient(RestClient.builder(HttpHost.create(uris))
+                .setDefaultHeaders(new Header[]{
+                        new BasicHeader("Authorization",
+                                String.format("Basic %s",
+                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
+                }));
+
+    }
+
+    @Bean
+    public OpenSearchClient openSearchClient() {
+        RestClient restClient = RestClient.builder(HttpHost.create(uris))
+                .setDefaultHeaders(new Header[]{
+                        new BasicHeader("Authorization",
+                                String.format("Basic %s",
+                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
+                }).build();
+
+        return new OpenSearchClient(new RestClientTransport(
+                restClient, new JacksonJsonpMapper()));
+    }
+
 }

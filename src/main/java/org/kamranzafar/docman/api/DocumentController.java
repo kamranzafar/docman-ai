@@ -33,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -46,7 +47,7 @@ public class DocumentController {
 
     @RequestMapping(method = RequestMethod.POST)
     public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
-                                    @RequestPart Map<String, String> metadata) {
+                                    @RequestPart Map<String, Object> metadata) {
         try {
             Document document = new Document();
             document.setData(file.getInputStream().readAllBytes());
@@ -64,10 +65,18 @@ public class DocumentController {
         }
     }
 
+    @GetMapping("/ask")
+    public ResponseEntity<?> ask(@RequestBody DocumentSearchRequest request) {
+        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+        response.setAnswer(documentService.ask(request.getQuestion()));
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/metadata")
     public ResponseEntity<?> getMetadata(@RequestBody DocumentSearchRequest request) {
-        DocumentSearchResponse response = new DocumentSearchResponse();
-        response.setDocument(documentService.findMetadata(UUID.fromString(request.getId())));
+        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+        response.setDocuments(Collections.singletonList(documentService.findMetadata(UUID.fromString(request.getId()))));
 
         return ResponseEntity.ok(response);
     }

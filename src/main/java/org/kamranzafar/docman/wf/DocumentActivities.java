@@ -27,9 +27,8 @@ public interface DocumentActivities {
     Document create(Document document);
     @ActivityMethod
     Document update(Document document);
-    String extract(String documentId);
     @ActivityMethod
-    Document index(String documentId, String content);
+    void index(Document document);
     @ActivityMethod
     void notify(String documentId, String msg);
 }

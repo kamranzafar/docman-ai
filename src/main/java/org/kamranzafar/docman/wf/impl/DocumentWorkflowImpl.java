@@ -42,7 +42,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
         this.activities = () -> Workflow.newActivityStub(
                 DocumentActivities.class,
                 ActivityOptions.newBuilder()
-                        .setStartToCloseTimeout(Duration.ofSeconds(30))
+                        .setStartToCloseTimeout(Duration.ofSeconds(300))
                         .setRetryOptions(RetryOptions.newBuilder()
                                 .setMaximumAttempts(3)
                                 .setInitialInterval(Duration.ofSeconds(1))
@@ -55,15 +55,10 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
     public void processDocument(Document document) {
         var activity = activities.get();
 
-        String extractedData =
-                Async.function(() -> activity.extract(document.getId().toString())).get();
-
-        if (!StringUtils.isBlank(extractedData)) {
-            Async.function(() -> {
-                activity.index(document.getId().toString(), extractedData);
-                return null;
-            }).get();
-        }
+        Async.function(() -> {
+            activity.index(document);
+            return null;
+        }).get();
 
         activity.notify(document.getId().toString(), "Success");
     }
