@@ -17,15 +17,7 @@
 
 package org.kamranzafar.docman;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.message.BasicHeader;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.transport.rest_client.RestClientTransport;
-import org.opensearch.data.client.orhlc.AbstractOpenSearchConfiguration;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.TokenCountBatchingStrategy;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -36,11 +28,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
-import java.net.URI;
-import java.util.Base64;
-
 @Configuration
-public class OpenSearchConfig extends AbstractOpenSearchConfiguration {
+public class OpenSearchConfig {//extends AbstractOpenSearchConfiguration {
     @Value("${spring.ai.vectorstore.opensearch.uris}")
     private String uris;
 
@@ -59,41 +48,41 @@ public class OpenSearchConfig extends AbstractOpenSearchConfiguration {
     @Autowired
     private EmbeddingModel embeddingModel;
 
-    @Bean
-    public VectorStore vectorStore(OpenSearchClient openSearchClient, EmbeddingModel embeddingModel) {
-        return OpenSearchVectorStore.builder(openSearchClient, embeddingModel)
-                .index(indexName)                // Optional: defaults to "spring-ai-document-index"
-                .similarityFunction("l2")             // Optional: defaults to "cosinesimil"
-                .useApproximateKnn(true)              // Optional: defaults to false (exact k-NN)
-                .dimensions(1536)                     // Optional: defaults to 1536 or embedding model's dimensions
-                .initializeSchema(true)               // Optional: defaults to false
-                .batchingStrategy(new TokenCountBatchingStrategy()) // Optional: defaults to TokenCountBatchingStrategy
-                .build();
-    }
+//    @Bean
+//    public VectorStore vectorStore(OpenSearchClient openSearchClient, EmbeddingModel embeddingModel) {
+//        return OpenSearchVectorStore.builder(openSearchClient, embeddingModel)
+//                .index(indexName)                // Optional: defaults to "spring-ai-document-index"
+//                .similarityFunction("l2")             // Optional: defaults to "cosinesimil"
+//                .useApproximateKnn(true)              // Optional: defaults to false (exact k-NN)
+//                .dimensions(1536)                     // Optional: defaults to 1536 or embedding model's dimensions
+//                .initializeSchema(true)               // Optional: defaults to false
+//                .batchingStrategy(new TokenCountBatchingStrategy()) // Optional: defaults to TokenCountBatchingStrategy
+//                .build();
+//    }
 
-    @Override
-    @Bean
-    public RestHighLevelClient opensearchClient() {
-        return new RestHighLevelClient(RestClient.builder(HttpHost.create(uris))
-                .setDefaultHeaders(new Header[]{
-                        new BasicHeader("Authorization",
-                                String.format("Basic %s",
-                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
-                }));
+//    @Override
+//    @Bean
+//    public RestHighLevelClient opensearchClient() {
+//        return new RestHighLevelClient(RestClient.builder(HttpHost.create(uris))
+//                .setDefaultHeaders(new Header[]{
+//                        new BasicHeader("Authorization",
+//                                String.format("Basic %s",
+//                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
+//                }));
+//
+//    }
 
-    }
-
-    @Bean
-    public OpenSearchClient openSearchClient() {
-        RestClient restClient = RestClient.builder(HttpHost.create(uris))
-                .setDefaultHeaders(new Header[]{
-                        new BasicHeader("Authorization",
-                                String.format("Basic %s",
-                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
-                }).build();
-
-        return new OpenSearchClient(new RestClientTransport(
-                restClient, new JacksonJsonpMapper()));
-    }
+//    @Bean
+//    public OpenSearchClient openSearchClient() {
+//        RestClient restClient = RestClient.builder(HttpHost.create(uris))
+//                .setDefaultHeaders(new Header[]{
+//                        new BasicHeader("Authorization",
+//                                String.format("Basic %s",
+//                                        Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))
+//                }).build();
+//
+//        return new OpenSearchClient(new RestClientTransport(
+//                restClient, new JacksonJsonpMapper()));
+//    }
 
 }
