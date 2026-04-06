@@ -130,8 +130,8 @@ services:
     environment:
       - cluster.name=docman-opensearch-cluster
       - node.name=docman-opensearch-node1
-      - discovery.seed_hosts=docman-opensearch-node1,docman-opensearch-node2
-      - cluster.initial_cluster_manager_nodes=docman-opensearch-node1,docman-opensearch-node2
+      - discovery.seed_hosts=docman-opensearch-node1
+      - cluster.initial_cluster_manager_nodes=docman-opensearch-node1
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=SecureP@ssword1
@@ -143,35 +143,35 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - opensearch-data1:/usr/share/opensearch/data
+      - opensearch-data:/usr/share/opensearch/data
     ports:
       - 9200:9200
       - 9600:9600
     networks:
       - docman-network
 
-  docman-opensearch-node2:
-    image: opensearchproject/opensearch:latest
-    container_name: docman-opensearch-node2
-    environment:
-      - cluster.name=docman-opensearch-cluster
-      - node.name=docman-opensearch-node2
-      - discovery.seed_hosts=docman-opensearch-node1,docman-opensearch-node2
-      - cluster.initial_cluster_manager_nodes=docman-opensearch-node1,docman-opensearch-node2
-      - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=SecureP@ssword1
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - opensearch-data2:/usr/share/opensearch/data
-    networks:
-      - docman-network
+#  docman-opensearch-node2:
+#    image: opensearchproject/opensearch:latest
+#    container_name: docman-opensearch-node2
+#    environment:
+#      - cluster.name=docman-opensearch-cluster
+#      - node.name=docman-opensearch-node2
+#      - discovery.seed_hosts=docman-opensearch-node1,docman-opensearch-node2
+#      - cluster.initial_cluster_manager_nodes=docman-opensearch-node1,docman-opensearch-node2
+#      - bootstrap.memory_lock=true
+#      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+#      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=SecureP@ssword1
+#    ulimits:
+#      memlock:
+#        soft: -1
+#        hard: -1
+#      nofile:
+#        soft: 65536
+#        hard: 65536
+#    volumes:
+#      - opensearch-data2:/usr/share/opensearch/data
+#    networks:
+#      - docman-network
 
   docman-opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:latest
@@ -179,7 +179,7 @@ services:
     ports:
       - 5601:5601
     environment:
-      - OPENSEARCH_HOSTS=["https://docman-opensearch-node1:9200","https://docman-opensearch-node2:9200"]
+      - OPENSEARCH_HOSTS=["https://docman-opensearch-node1:9200"]
     networks:
       - docman-network
 
@@ -189,8 +189,8 @@ networks:
     name: docman-network
 
 volumes:
-  opensearch-data1:
-  opensearch-data2:
+  opensearch-data:
+  #opensearch-data2:
   mongo_data:
   minio-volume:
     driver: local

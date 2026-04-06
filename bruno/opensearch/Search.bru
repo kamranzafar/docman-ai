@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: https://localhost:9200/document_index/_search
+  url: https://localhost:9200/docman-vector-index/_search
   body: json
   auth: basic
 }
@@ -22,9 +22,7 @@ auth:basic {
 body:json {
   {
     "query": {
-       "query_string": {
-         "query": "metadata.type:id*"
-       }
+      "match_all": {}
     }
   }
 }
