@@ -1,0 +1,22 @@
+meta {
+  name: Ask
+  type: http
+  seq: 6
+}
+
+post {
+  url: http://localhost:8081/document/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "question":"why is panama canal important?"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

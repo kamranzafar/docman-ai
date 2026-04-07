@@ -4,15 +4,15 @@ meta {
   seq: 5
 }
 
-get {
-  url: http://localhost:8081/document/content
+post {
+  url: http://localhost:8081/document/search
   body: json
   auth: inherit
 }
 
 body:json {
   {
-    "id":"e4bbd492-9514-456a-b98e-441eac24d347"
+    "query":"{\r\n  \"_source\": false,\r\n  \"query\": {\r\n    \"bool\": {\r\n      \"must\": [\r\n        {\r\n          \"match\": {\r\n            \"metadata.parent_document_id\": \"c41fbd93-cbbd-43f3-a8a4-d6bee9c5a3c1\"\r\n          }\r\n        }\r\n      ]\r\n    }\r\n  },\r\n  \"collapse\": {\r\n    \"field\": \"metadata.parent_document_id.keyword\"\r\n  }\r\n}"
   }
 }
 
