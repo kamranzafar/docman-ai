@@ -19,6 +19,7 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
@@ -64,7 +65,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
             log.info("Added Documents to Vector Store {}", vectorStore.getName());
 
-            document.setStatus(DocumentStatus.INDEXED.name());
+            document.getMetadata().put(DocumentProperties.STATUS, DocumentStatus.INDEXED.name());
 
             documentMetadataRepository.save(document);
         }

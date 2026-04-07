@@ -24,5 +24,6 @@ import lombok.Data;
 @Builder
 public class DocumentSearchRequest {
     String id;
+    String query;
     String question;
 }

@@ -17,6 +17,7 @@
 
 package org.kamranzafar.docman.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
@@ -27,12 +28,9 @@ import java.util.UUID;
 @org.springframework.data.mongodb.core.mapping.Document(collection = "documents")
 @Data
 public class Document {
+    @JsonIgnore
     @Id
     UUID id;
-    String name;
-    String location;
-    String contentType;
-    String status;
     @Transient
     byte[] data;
     Map<String, Object> metadata;

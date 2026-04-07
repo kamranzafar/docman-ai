@@ -22,6 +22,7 @@ import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import org.jetbrains.annotations.NotNull;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
@@ -34,6 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,6 +59,8 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document create(Document document) {
         document.setId(UUID.randomUUID());
+        document.getMetadata().put(DocumentProperties.ID, document.getId());
+
         return saveDocument(document, DocumentStatus.CREATED.name());
     }
 
@@ -76,12 +81,12 @@ public class DocumentServiceImpl implements DocumentService {
 
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket("docman")
-                    .object(document.getId() + "/" + document.getName())
-                    .contentType(document.getContentType())
+                    .object(document.getId() + "/" + document.getMetadata().get(DocumentProperties.NAME))
+                    .contentType(document.getMetadata().get(DocumentProperties.CONTENT_TYPE).toString())
                     .stream(byteInputStream, byteInputStream.available(), -1)
                     .build());
 
-            document.setStatus(status);
+            document.getMetadata().put(DocumentProperties.STATUS, status);
 
             documentMetadataRepository.save(document);
 
@@ -140,10 +145,24 @@ public class DocumentServiceImpl implements DocumentService {
         try {
             document.setData(minioClient.getObject(GetObjectArgs.builder()
                     .bucket("docman")
-                    .object(document.getId() + "/" + document.getName())
+                    .object(document.getId() + "/" + document.getMetadata().get(DocumentProperties.NAME))
                     .build()).readAllBytes());
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public List<Document> search(String query) {
+        List<org.springframework.ai.document.Document> results = vectorStore.similaritySearch(query);
+        List<Document> documents = new ArrayList<>();
+        for (org.springframework.ai.document.Document d : results) {
+            Document document = new Document();
+            document.setMetadata(d.getMetadata());
+
+            documents.add(document);
+        }
+
+        return documents;
     }
 }

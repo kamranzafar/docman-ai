@@ -18,6 +18,7 @@
 package org.kamranzafar.docman.api;
 
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentSearchRequest;
 import org.kamranzafar.docman.model.DocumentSearchResponse;
 import org.kamranzafar.docman.service.DocumentService;
@@ -34,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,15 +47,18 @@ public class DocumentController {
     @Autowired
     private DocumentWorkflowManager documentWorkflowManager;
 
-    @RequestMapping(method = RequestMethod.POST)
+    @PostMapping
     public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
                                     @RequestPart Map<String, Object> metadata) {
         try {
             Document document = new Document();
             document.setData(file.getInputStream().readAllBytes());
-            document.setName(file.getOriginalFilename());
-            document.setContentType(file.getContentType());
-            document.setMetadata(metadata);
+
+            Map<String, Object> metadataMap = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+            metadataMap.put(DocumentProperties.CONTENT_TYPE, file.getContentType());
+            metadataMap.put(DocumentProperties.NAME, file.getName());
+
+            document.setMetadata(metadataMap);
 
             document = documentService.create(document);
 
@@ -65,10 +70,18 @@ public class DocumentController {
         }
     }
 
-    @GetMapping("/ask")
+    @PostMapping("/ask")
     public ResponseEntity<?> ask(@RequestBody DocumentSearchRequest request) {
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
         response.setAnswer(documentService.ask(request.getQuestion()));
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<?> search(@RequestBody DocumentSearchRequest request) {
+        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+        response.setDocuments(documentService.search(request.getQuery()));
 
         return ResponseEntity.ok(response);
     }
@@ -86,8 +99,9 @@ public class DocumentController {
         Document document = documentService.findContent(UUID.fromString(request.getId()));
         InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(document.getData()));
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + document.getName() + "\"")
-                .contentType(MediaType.parseMediaType(document.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + document.getMetadata().get(DocumentProperties.NAME) + "\"")
+                .contentType(MediaType.parseMediaType(document.getMetadata().get(DocumentProperties.CONTENT_TYPE).toString()))
                 .body(resource);
     }
 }

@@ -41,7 +41,7 @@ public class DocmanConfig {
     }
 
     @Bean
-    public TokenTextSplitter tokenTextSplitter(){
+    public TokenTextSplitter tokenTextSplitter() {
         return new TokenTextSplitter();
     }
 }

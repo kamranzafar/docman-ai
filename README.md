@@ -13,3 +13,8 @@ A reference implementation of AI enabled document management system.
 ## AI Models
 - nomic-embed-text
 - llama3
+
+## Features
+- Indexes various document types like PDF, DOC, TXT etc.
+- Supports vector search queries with user prompts
+- Supports metadata lexical search queries

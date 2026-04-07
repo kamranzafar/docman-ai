@@ -47,3 +47,5 @@ spring:
         model: llama3
         temperature: 1
         max-file-size: -1
+        options:
+          timeout: 600s
