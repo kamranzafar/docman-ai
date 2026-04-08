@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -57,7 +58,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
             org.springframework.ai.document.Document d
                     = new org.springframework.ai.document.Document(
-                    document.getId().toString(), ragDoc.getText(), document.getMetadata());
+                    document.getMetadata().get(DocumentProperties.ID).toString(), ragDoc.getText(), document.getMetadata());
 
             List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
 
@@ -67,6 +68,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
             document.getMetadata().put(DocumentProperties.STATUS, DocumentStatus.INDEXED.name());
 
+            document.setId(UUID.fromString(document.getMetadata().get(DocumentProperties.ID).toString()));
             documentMetadataRepository.save(document);
         }
     }

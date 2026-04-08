@@ -80,10 +80,7 @@ public class DocumentController {
 
     @PostMapping("/search")
     public ResponseEntity<?> search(@RequestBody DocumentSearchRequest request) {
-        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-        response.setDocuments(documentService.search(request.getQuery()));
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(documentService.search(request.getQuery()));
     }
 
     @GetMapping("/metadata")

@@ -17,7 +17,6 @@
 
 package org.kamranzafar.docman.wf.impl;
 
-import io.micrometer.common.util.StringUtils;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.spring.boot.WorkflowImpl;
@@ -25,6 +24,7 @@ import io.temporal.workflow.Async;
 import io.temporal.workflow.Workflow;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.wf.DocumentActivities;
 import org.kamranzafar.docman.wf.DocumentWorkflow;
 import org.springframework.stereotype.Service;
@@ -60,6 +60,6 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
             return null;
         }).get();
 
-        activity.notify(document.getId().toString(), "Success");
+        activity.notify(document.getMetadata().get(DocumentProperties.ID).toString(), "Success");
     }
 }

@@ -8,6 +8,7 @@ minio:
   address: http://localhost:9222
   user: minioadmin
   password: minioadmin
+  bucket: docman
 kafka:
   address: localhost:9092
   groupId: docman

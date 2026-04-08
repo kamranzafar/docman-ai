@@ -17,38 +17,59 @@
 
 package org.kamranzafar.docman.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
+import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch.core.SearchRequest;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.FieldCollapse;
+import org.opensearch.client.opensearch.core.search.Hit;
+import org.opensearch.client.opensearch.core.search.SourceConfig;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
+
+    @Value(value = "${minio.bucket}")
+    private String minioBucket;
+
+    @Value(value = "${spring.ai.vectorstore.opensearch.index-name}")
+    private String indexName;
+
     @Autowired
     private MinioClient minioClient;
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
     @Autowired
     private VectorStore vectorStore;
-
+    @Autowired
+    private OpenSearchClient openSearchClient;
     private final ChatClient chatClient;
 
     public DocumentServiceImpl(ChatClient.Builder chatClientBuilder) {
@@ -59,7 +80,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document create(Document document) {
         document.setId(UUID.randomUUID());
-        document.getMetadata().put(DocumentProperties.ID, document.getId());
+        document.getMetadata().put(DocumentProperties.ID, document.getId().toString());
 
         return saveDocument(document, DocumentStatus.CREATED.name());
     }
@@ -80,8 +101,9 @@ public class DocumentServiceImpl implements DocumentService {
             var byteInputStream = new ByteArrayInputStream(document.getData());
 
             minioClient.putObject(PutObjectArgs.builder()
-                    .bucket("docman")
-                    .object(document.getId() + "/" + document.getMetadata().get(DocumentProperties.NAME))
+                    .bucket(minioBucket)
+                    .object(document.getMetadata()
+                            .get(DocumentProperties.ID) + "/" + document.getMetadata().get(DocumentProperties.NAME))
                     .contentType(document.getMetadata().get(DocumentProperties.CONTENT_TYPE).toString())
                     .stream(byteInputStream, byteInputStream.available(), -1)
                     .build());
@@ -144,8 +166,9 @@ public class DocumentServiceImpl implements DocumentService {
     private void lookupDocument(Document document) {
         try {
             document.setData(minioClient.getObject(GetObjectArgs.builder()
-                    .bucket("docman")
-                    .object(document.getId() + "/" + document.getMetadata().get(DocumentProperties.NAME))
+                    .bucket(minioBucket)
+                    .object(document.getMetadata()
+                            .get(DocumentProperties.ID) + "/" + document.getMetadata().get(DocumentProperties.NAME))
                     .build()).readAllBytes());
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -153,16 +176,29 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public List<Document> search(String query) {
-        List<org.springframework.ai.document.Document> results = vectorStore.similaritySearch(query);
-        List<Document> documents = new ArrayList<>();
-        for (org.springframework.ai.document.Document d : results) {
-            Document document = new Document();
-            document.setMetadata(d.getMetadata());
+    public List<Object> search(String query) {
+        ObjectMapper objectMapper = new ObjectMapper();
 
-            documents.add(document);
+        SearchRequest request = SearchRequest.of(s -> s
+                .index(indexName)
+                .query(Query.of(q -> q.queryString(qs -> qs.query(query))))
+                .collapse(FieldCollapse.of(fc -> fc.field(QueryConstants.QUERY_COLLAPSE_FIELD)))
+                .source(SourceConfig.of(sc ->
+                        sc.filter(sf -> sf.includes(QueryConstants.QUERY_SOURCE_INCLUDE))))
+        );
+
+        try {
+            SearchResponse<Object> response = openSearchClient.search(request, Object.class);
+
+            List<Object> documents = new ArrayList<>();
+            for (Hit<Object> hit : response.hits().hits()) {
+                log.info("Document found {}", hit.source());
+                documents.add(hit.source());
+            }
+
+            return documents;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-
-        return documents;
     }
 }
