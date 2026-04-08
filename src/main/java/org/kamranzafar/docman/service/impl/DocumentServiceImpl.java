@@ -98,7 +98,7 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         try {
-            var byteInputStream = new ByteArrayInputStream(document.getData());
+            ByteArrayInputStream byteInputStream = new ByteArrayInputStream(document.getData());
 
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(minioBucket)

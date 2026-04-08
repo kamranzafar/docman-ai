@@ -53,7 +53,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
     @Override
     public void processDocument(Document document) {
-        var activity = activities.get();
+        DocumentActivities activity = activities.get();
 
         Async.function(() -> {
             activity.index(document);

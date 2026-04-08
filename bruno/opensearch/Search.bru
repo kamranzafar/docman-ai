@@ -21,8 +21,12 @@ auth:basic {
 
 body:json {
   {
+      "_source": { "includes": ["metadata"] },
     "query": {
-      "match_all": {}
+      "query_string": {
+        "query":"metadata.parent_document_id:474d9a7d-2a25-4fc7-a259-41bfbd7c3ae3"}
+    },"collapse": {
+      "field": "metadata.id.keyword"
     }
   }
 }
