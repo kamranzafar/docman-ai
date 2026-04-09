@@ -17,12 +17,13 @@
 
 package org.kamranzafar.docman.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.kamranzafar.docman.exception.DocmanException;
+import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
@@ -93,8 +94,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     @NotNull
     private Document saveDocument(Document document, String status) {
+        log.debug("Saving document with id {}", document.getId());
+
         if (document.getData() == null) {
-            return document;
+            throw new DocmanException("Document content is null");
         }
 
         try {
@@ -136,6 +139,8 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public Document findContent(UUID id) {
+        log.debug("Find content for document id {}", id);
+
         Optional<Document> op = documentMetadataRepository.findById(id);
         if (op.isEmpty()) {
             throw new RuntimeException("Document not found");
@@ -150,6 +155,8 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public String ask(String question) {
+        log.debug("Vector search with prompt {}", question);
+
         ChatResponse response = chatClient.prompt()
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
                 .user(question)
@@ -171,13 +178,14 @@ public class DocumentServiceImpl implements DocumentService {
                             .get(DocumentProperties.ID) + "/" + document.getMetadata().get(DocumentProperties.NAME))
                     .build()).readAllBytes());
         } catch (Throwable e) {
-            throw new RuntimeException(e);
+            throw new DocmanException(String.format("Could not lookup content for document %s", document.getMetadata()
+                    .get(DocumentProperties.ID)), e);
         }
     }
 
     @Override
     public List<Object> search(String query) {
-        ObjectMapper objectMapper = new ObjectMapper();
+        log.debug("Searching for documents with query {}", query);
 
         SearchRequest request = SearchRequest.of(s -> s
                 .index(indexName)
@@ -190,6 +198,10 @@ public class DocumentServiceImpl implements DocumentService {
         try {
             SearchResponse<Object> response = openSearchClient.search(request, Object.class);
 
+            if (response.hits().hits().isEmpty()) {
+                throw new DocumentNotFoundException("No matching document(s) found");
+            }
+
             List<Object> documents = new ArrayList<>();
             for (Hit<Object> hit : response.hits().hits()) {
                 log.info("Document found {}", hit.source());
@@ -198,7 +210,7 @@ public class DocumentServiceImpl implements DocumentService {
 
             return documents;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new DocmanException("Failed to search documents", e);
         }
     }
 }
