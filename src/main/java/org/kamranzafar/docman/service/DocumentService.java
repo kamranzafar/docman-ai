@@ -31,8 +31,6 @@ public interface DocumentService {
 
     Document findMetadata(UUID id);
 
-    Document findContent(UUID id);
-
     String ask(String question);
 
     List<Object> search(String query);

@@ -1,5 +1,4 @@
 /**
- *
  * Copyright 2026 Kamran Zafar
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +14,12 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.model;
+package org.kamranzafar.docman.service;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.Builder;
-import lombok.Data;
+import org.kamranzafar.docman.model.Document;
 
-import java.util.List;
+public interface PresignedUrlService {
+    String downloadUrl(Document document);
 
-@Data
-@Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class DocumentSearchResponse {
-    List<Document> documents;
-    String answer;
+    String uploadUrl(Document document);
 }

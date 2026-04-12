@@ -24,7 +24,6 @@ import io.temporal.workflow.Async;
 import io.temporal.workflow.Workflow;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
-import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.wf.DocumentActivities;
 import org.kamranzafar.docman.wf.DocumentWorkflow;
 import org.springframework.stereotype.Service;
@@ -60,6 +59,6 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
             return null;
         }).get();
 
-        activity.notify(document.getMetadata().get(DocumentProperties.ID).toString(), "Success");
+        activity.notify(document.getId().toString(), "Success");
     }
 }

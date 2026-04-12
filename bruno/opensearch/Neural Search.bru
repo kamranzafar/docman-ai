@@ -21,7 +21,7 @@ auth:basic {
 
 body:json {
   {
-    "_source": false,
+    "_source": ["metadata"],
     "query": {
       "bool": {
         "must": [

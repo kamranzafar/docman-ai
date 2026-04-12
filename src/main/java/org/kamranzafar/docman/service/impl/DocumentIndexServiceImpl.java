@@ -17,9 +17,11 @@
 
 package org.kamranzafar.docman.service.impl;
 
+import io.minio.GetObjectArgs;
+import io.minio.MinioClient;
 import lombok.extern.slf4j.Slf4j;
+import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.Document;
-import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
@@ -27,49 +29,62 @@ import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
 public class DocumentIndexServiceImpl implements DocumentIndexService {
+    @Value(value = "${minio.bucket}")
+    private String minioBucket;
+
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
     @Autowired
+    private MinioClient minioClient;
+    @Autowired
     private TokenTextSplitter textSplitter;
     @Autowired
-    VectorStore vectorStore;
+    private VectorStore vectorStore;
 
     @Transactional
     @Override
     public void index(Document document) {
-        TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(new ByteArrayResource(document.getData()));
-        List<org.springframework.ai.document.Document> documents = tikaDocumentReader.get();
+        try {
+            InputStreamResource documentResource = new InputStreamResource(
+                    minioClient.getObject(GetObjectArgs.builder()
+                            .bucket(minioBucket)
+                            .object(String.format("%s/%s", document.getId(), document.getName()))
+                            .build()));
 
-        if (!documents.isEmpty()) {
-            org.springframework.ai.document.Document ragDoc = documents.get(0);
+            TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(documentResource);
+            List<org.springframework.ai.document.Document> documents = tikaDocumentReader.get();
 
-            assert ragDoc.getMedia() != null;
-            assert ragDoc.getText() != null;
+            if (!documents.isEmpty()) {
+                org.springframework.ai.document.Document ragDoc = documents.get(0);
 
-            org.springframework.ai.document.Document d
-                    = new org.springframework.ai.document.Document(
-                    document.getMetadata().get(DocumentProperties.ID).toString(), ragDoc.getText(), document.getMetadata());
+                assert ragDoc.getMedia() != null;
+                assert ragDoc.getText() != null;
 
-            List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
+                org.springframework.ai.document.Document d
+                        = new org.springframework.ai.document.Document(
+                        document.getId().toString(), ragDoc.getText(), document.getMetadata());
 
-            vectorStore.add(splitDocuments);
+                List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
 
-            log.info("Added Documents to Vector Store {}", vectorStore.getName());
+                vectorStore.add(splitDocuments);
+                log.info("Added Documents to Vector Store {}", vectorStore.getName());
+                document.setStatus(DocumentStatus.INDEXED.name());
 
-            document.getMetadata().put(DocumentProperties.STATUS, DocumentStatus.INDEXED.name());
+                documentMetadataRepository.save(document);
 
-            document.setId(UUID.fromString(document.getMetadata().get(DocumentProperties.ID).toString()));
-            documentMetadataRepository.save(document);
+            }
+        } catch (Throwable e) {
+            throw new DocmanException(String.format("Could not lookup content for document %s", document.getId()), e);
         }
     }
 }

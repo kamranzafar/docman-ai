@@ -28,10 +28,10 @@ import java.util.UUID;
 @org.springframework.data.mongodb.core.mapping.Document(collection = "documents")
 @Data
 public class Document {
-    @JsonIgnore
     @Id
     UUID id;
-    @Transient
-    byte[] data;
+    String name;
+    String contentType;
+    String status;
     Map<String, Object> metadata;
 }

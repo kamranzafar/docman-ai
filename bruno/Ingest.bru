@@ -1,22 +1,28 @@
 meta {
   name: Ingest
   type: http
-  seq: 2
+  seq: 1
 }
 
 post {
   url: http://localhost:8081/document
-  body: multipartForm
+  body: json
   auth: inherit
 }
 
 headers {
-  Content-Type: multipart/form-data
+  Content-Type: application/json
 }
 
-body:multipart-form {
-  metadata: @file(metadata.json)
-  file: @file(/Users/kamran/workspace/idea/rag-demo/src/main/resources/docs/CDOC-119hdoc1.pdf)
+body:json {
+  {
+    "name": "test.txt",
+    "contentType": "text/plain",
+    "metadata": {
+      "type": "ID_DOC",
+      "lifeCycle": "YR_7"
+    }
+  }
 }
 
 settings {

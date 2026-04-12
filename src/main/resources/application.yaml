@@ -1,14 +1,13 @@
 server:
   port: 8081
-ssl:
-  keystore:
-    file: /Users/kamran/certs/opensearch-truststore.jks
-    password: changeit
 minio:
   address: http://localhost:9222
   user: minioadmin
   password: minioadmin
   bucket: docman
+  presigned:
+    upload-url-expiry: 300
+    download-url-expiry: 300
 kafka:
   address: localhost:9092
   groupId: docman

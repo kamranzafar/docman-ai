@@ -17,15 +17,11 @@
 
 package org.kamranzafar.docman.service.impl;
 
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.Document;
-import org.kamranzafar.docman.model.DocumentProperties;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
@@ -46,7 +42,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,15 +51,9 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
-
-    @Value(value = "${minio.bucket}")
-    private String minioBucket;
-
     @Value(value = "${spring.ai.vectorstore.opensearch.index-name}")
     private String indexName;
 
-    @Autowired
-    private MinioClient minioClient;
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
     @Autowired
@@ -81,7 +70,6 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document create(Document document) {
         document.setId(UUID.randomUUID());
-        document.getMetadata().put(DocumentProperties.ID, document.getId().toString());
 
         return saveDocument(document, DocumentStatus.CREATED.name());
     }
@@ -89,36 +77,17 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional
     @Override
     public Document update(Document document) {
-        return saveDocument(document, DocumentStatus.CREATED.name());
+        return saveDocument(document, DocumentStatus.UPDATED.name());
     }
 
     @NotNull
     private Document saveDocument(Document document, String status) {
         log.debug("Saving document with id {}", document.getId());
 
-        if (document.getData() == null) {
-            throw new DocmanException("Document content is null");
-        }
+        document.setStatus(status);
+        documentMetadataRepository.save(document);
 
-        try {
-            ByteArrayInputStream byteInputStream = new ByteArrayInputStream(document.getData());
-
-            minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(minioBucket)
-                    .object(document.getMetadata()
-                            .get(DocumentProperties.ID) + "/" + document.getMetadata().get(DocumentProperties.NAME))
-                    .contentType(document.getMetadata().get(DocumentProperties.CONTENT_TYPE).toString())
-                    .stream(byteInputStream, byteInputStream.available(), -1)
-                    .build());
-
-            document.getMetadata().put(DocumentProperties.STATUS, status);
-
-            documentMetadataRepository.save(document);
-
-            return document;
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
+        return document;
     }
 
     @Transactional
@@ -138,22 +107,6 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public Document findContent(UUID id) {
-        log.debug("Find content for document id {}", id);
-
-        Optional<Document> op = documentMetadataRepository.findById(id);
-        if (op.isEmpty()) {
-            throw new RuntimeException("Document not found");
-        }
-
-        Document document = op.get();
-
-        lookupDocument(document);
-
-        return document;
-    }
-
-    @Override
     public String ask(String question) {
         log.debug("Vector search with prompt {}", question);
 
@@ -168,19 +121,6 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         return null;
-    }
-
-    private void lookupDocument(Document document) {
-        try {
-            document.setData(minioClient.getObject(GetObjectArgs.builder()
-                    .bucket(minioBucket)
-                    .object(document.getMetadata()
-                            .get(DocumentProperties.ID) + "/" + document.getMetadata().get(DocumentProperties.NAME))
-                    .build()).readAllBytes());
-        } catch (Throwable e) {
-            throw new DocmanException(String.format("Could not lookup content for document %s", document.getMetadata()
-                    .get(DocumentProperties.ID)), e);
-        }
     }
 
     @Override

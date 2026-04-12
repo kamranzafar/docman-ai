@@ -17,23 +17,14 @@
 
 package org.kamranzafar.docman.api;
 
-import org.kamranzafar.docman.model.Document;
-import org.kamranzafar.docman.model.DocumentProperties;
-import org.kamranzafar.docman.model.DocumentSearchRequest;
-import org.kamranzafar.docman.model.DocumentSearchResponse;
+import org.kamranzafar.docman.model.*;
 import org.kamranzafar.docman.service.DocumentService;
+import org.kamranzafar.docman.service.PresignedUrlService;
 import org.kamranzafar.docman.wf.DocumentWorkflowManager;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,29 +36,30 @@ public class DocumentController {
     @Autowired
     private DocumentService documentService;
     @Autowired
+    private PresignedUrlService presignedUrlService;
+    @Autowired
     private DocumentWorkflowManager documentWorkflowManager;
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
-                                    @RequestPart Map<String, Object> metadata) {
-        try {
-            Document document = new Document();
-            document.setData(file.getInputStream().readAllBytes());
+    public ResponseEntity<?> create(@RequestBody DocumentRequest documentRequest) {
+        Document document = new Document();
+        document.setName(documentRequest.getName());
+        document.setContentType(documentRequest.getContentType());
 
-            Map<String, Object> metadataMap = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
-            metadataMap.put(DocumentProperties.CONTENT_TYPE, file.getContentType());
-            metadataMap.put(DocumentProperties.NAME, file.getName());
+        Map<String, Object> metadataMap = documentRequest.getMetadata() == null
+                ? new HashMap<>() : new HashMap<>(documentRequest.getMetadata());
 
-            document.setMetadata(metadataMap);
+        document.setMetadata(metadataMap);
+        document = documentService.create(document);
 
-            document = documentService.create(document);
+        String url = presignedUrlService.uploadUrl(document);
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setUrl(url);
+        documentResponse.setDocument(document);
 
-            documentWorkflowManager.createWorkflow(document);
+        //documentWorkflowManager.createWorkflow(document);
 
-            return ResponseEntity.ok(document);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading image");
-        }
+        return ResponseEntity.ok(documentResponse);
     }
 
     @PostMapping("/ask")
@@ -93,12 +85,12 @@ public class DocumentController {
 
     @GetMapping("/content")
     public ResponseEntity<?> getContent(@RequestBody DocumentSearchRequest request) {
-        Document document = documentService.findContent(UUID.fromString(request.getId()));
-        InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(document.getData()));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + document.getMetadata().get(DocumentProperties.NAME) + "\"")
-                .contentType(MediaType.parseMediaType(document.getMetadata().get(DocumentProperties.CONTENT_TYPE).toString()))
-                .body(resource);
+        Document document = documentService.findMetadata(UUID.fromString(request.getId()));
+        String url = presignedUrlService.downloadUrl(document);
+
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setUrl(url);
+
+        return ResponseEntity.ok(documentResponse);
     }
 }

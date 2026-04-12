@@ -2,11 +2,11 @@
 A reference implementation of AI enabled document management system.
 
 ## Technology Stack
-- Spring Boot for API
+- Spring Boot for REST
 - MINIO (Object store)
 - MongoDB (Metadata store)
 - OpenSearch as Vector DB
-- Ollama AI for document search
+- Ollama AI for document insights
 - Temporal for document workflow execution
 - Kafka to emit document workflow events
 
@@ -15,9 +15,10 @@ A reference implementation of AI enabled document management system.
 - llama3
 
 ## Features
-- Indexes various document types like PDF, DOC, TXT etc.
-- Supports vector search queries with user prompts
-- Supports metadata lexical search queries
+- Support for various document types like PDF, DOC, TXT etc.
+- Document upload and download using Pre-signed URLs
+- Vector search queries with user prompts
+- Metadata lexical search queries
 
 ## Setup
 
