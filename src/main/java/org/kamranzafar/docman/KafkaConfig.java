@@ -21,6 +21,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 
 import java.util.HashMap;
@@ -42,6 +44,8 @@ public class KafkaConfig {
     private String groupId;
     @Value(value = "${kafka.topic}")
     private String topic;
+    @Value(value = "${kafka.message-retention:86400000}")
+    private String messageRetention;
 
     @Bean
     public KafkaAdmin kafkaAdmin() {
@@ -52,7 +56,11 @@ public class KafkaConfig {
 
     @Bean
     public NewTopic documentTopic() {
-        return new NewTopic(topic, 1, (short) 1);
+        return TopicBuilder.name(topic)
+                .partitions(1)
+                .replicas(1)
+                .config(TopicConfig.RETENTION_MS_CONFIG, messageRetention) // 24 hours
+                .build();
     }
 
     @Bean

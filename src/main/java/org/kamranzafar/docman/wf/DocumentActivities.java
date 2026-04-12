@@ -27,6 +27,7 @@ public interface DocumentActivities {
     Document create(Document document);
     @ActivityMethod
     Document update(Document document);
+    boolean checkUploadStatus(Document document);
     @ActivityMethod
     void index(Document document);
     @ActivityMethod

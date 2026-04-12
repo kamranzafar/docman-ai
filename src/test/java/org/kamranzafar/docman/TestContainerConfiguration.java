@@ -7,7 +7,7 @@ import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+class TestContainerConfiguration {
     @Bean
     MongoDBContainer mongoDbContainer() {
         return new MongoDBContainer(DockerImageName.parse("mongo:8"));

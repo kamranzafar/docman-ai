@@ -12,6 +12,7 @@ kafka:
   address: localhost:9092
   groupId: docman
   topic: documents
+  message-retention: 86400000
 spring:
   main:
     allow-bean-definition-overriding: true

@@ -54,6 +54,8 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
     public void processDocument(Document document) {
         DocumentActivities activity = activities.get();
 
+        activity.checkUploadStatus(document);
+
         Async.function(() -> {
             activity.index(document);
             return null;

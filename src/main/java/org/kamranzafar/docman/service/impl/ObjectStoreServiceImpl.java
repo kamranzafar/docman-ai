@@ -16,12 +16,12 @@
 
 package org.kamranzafar.docman.service.impl;
 
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
+import io.minio.*;
+import io.minio.errors.*;
 import io.minio.http.Method;
 import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.Document;
-import org.kamranzafar.docman.service.PresignedUrlService;
+import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-public class PresignedUrlServiceImpl implements PresignedUrlService {
+public class ObjectStoreServiceImpl implements ObjectStoreService {
     public static final String MINIO_RESPONSE_CONTENT_TYPE_KEY = "response-content-type";
     @Autowired
     private MinioClient minioClient;
@@ -45,7 +45,21 @@ public class PresignedUrlServiceImpl implements PresignedUrlService {
     private int minioDownloadExpiry;
 
     @Override
-    public String downloadUrl(Document document) {
+    public boolean documentExists(Document document) {
+        try {
+            minioClient.statObject(StatObjectArgs.builder()
+                    .bucket(minioBucket)
+                    .object(String.format("%s/%s", document.getId(), document.getName())).build());
+            return true;
+        } catch (ErrorResponseException e) {
+            return false;
+        } catch (Throwable e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String presignedDownloadUrl(Document document) {
         Map<String, String> reqParams = new HashMap<>();
         reqParams.put(MINIO_RESPONSE_CONTENT_TYPE_KEY, document.getContentType());
 
@@ -64,7 +78,7 @@ public class PresignedUrlServiceImpl implements PresignedUrlService {
     }
 
     @Override
-    public String uploadUrl(Document document) {
+    public String presignedUploadUrl(Document document) {
         try {
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()

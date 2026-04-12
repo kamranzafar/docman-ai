@@ -19,7 +19,7 @@ package org.kamranzafar.docman.api;
 
 import org.kamranzafar.docman.model.*;
 import org.kamranzafar.docman.service.DocumentService;
-import org.kamranzafar.docman.service.PresignedUrlService;
+import org.kamranzafar.docman.service.ObjectStoreService;
 import org.kamranzafar.docman.wf.DocumentWorkflowManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +36,7 @@ public class DocumentController {
     @Autowired
     private DocumentService documentService;
     @Autowired
-    private PresignedUrlService presignedUrlService;
+    private ObjectStoreService objectStoreService;
     @Autowired
     private DocumentWorkflowManager documentWorkflowManager;
 
@@ -52,12 +52,12 @@ public class DocumentController {
         document.setMetadata(metadataMap);
         document = documentService.create(document);
 
-        String url = presignedUrlService.uploadUrl(document);
+        String url = objectStoreService.presignedUploadUrl(document);
         DocumentResponse documentResponse = new DocumentResponse();
         documentResponse.setUrl(url);
         documentResponse.setDocument(document);
 
-        //documentWorkflowManager.createWorkflow(document);
+        documentWorkflowManager.createWorkflow(document);
 
         return ResponseEntity.ok(documentResponse);
     }
@@ -86,7 +86,7 @@ public class DocumentController {
     @GetMapping("/content")
     public ResponseEntity<?> getContent(@RequestBody DocumentSearchRequest request) {
         Document document = documentService.findMetadata(UUID.fromString(request.getId()));
-        String url = presignedUrlService.downloadUrl(document);
+        String url = objectStoreService.presignedDownloadUrl(document);
 
         DocumentResponse documentResponse = new DocumentResponse();
         documentResponse.setUrl(url);

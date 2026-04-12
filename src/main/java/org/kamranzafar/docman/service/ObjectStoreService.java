@@ -18,8 +18,10 @@ package org.kamranzafar.docman.service;
 
 import org.kamranzafar.docman.model.Document;
 
-public interface PresignedUrlService {
-    String downloadUrl(Document document);
+public interface ObjectStoreService {
+    boolean documentExists(Document document);
 
-    String uploadUrl(Document document);
+    String presignedDownloadUrl(Document document);
+
+    String presignedUploadUrl(Document document);
 }
