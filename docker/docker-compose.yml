@@ -120,8 +120,8 @@ services:
     volumes:
       - minio-volume:/data
     ports:
-      - "9222:9000"
-      - "9223:9001"
+      - "9000:9000"
+      - "9001:9001"
     command: [ "server", "--console-address", ":9001", "/data" ]
 
   docman-opensearch-node1:

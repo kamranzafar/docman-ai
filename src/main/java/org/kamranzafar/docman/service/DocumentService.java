@@ -19,7 +19,6 @@ package org.kamranzafar.docman.service;
 
 import org.kamranzafar.docman.model.Document;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface DocumentService {
@@ -30,8 +29,4 @@ public interface DocumentService {
     Document delete(Document document);
 
     Document findMetadata(UUID id);
-
-    String ask(String question);
-
-    List<Object> search(String query);
 }

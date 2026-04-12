@@ -1,8 +1,4 @@
 {
-  "name": "test.txt",
-  "contentType": "text/plain",
-  "metadata": {
-    "type": "ID_DOC",
-    "lifeCycle": "YR_7"
-  }
+  "type": "ID_DOC",
+  "lifeCycle": "YR_7"
 }

@@ -34,4 +34,7 @@ public class Document {
     String contentType;
     String status;
     Map<String, Object> metadata;
+    @Transient
+    @JsonIgnore
+    byte[] content;
 }

@@ -17,14 +17,18 @@
 
 package org.kamranzafar.docman.api;
 
+import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.*;
+import org.kamranzafar.docman.service.DocumentSearchService;
 import org.kamranzafar.docman.service.DocumentService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.kamranzafar.docman.wf.DocumentWorkflowManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +39,8 @@ import java.util.UUID;
 public class DocumentController {
     @Autowired
     private DocumentService documentService;
+    @Autowired
+    private DocumentSearchService documentSearchService;
     @Autowired
     private ObjectStoreService objectStoreService;
     @Autowired
@@ -62,17 +68,42 @@ public class DocumentController {
         return ResponseEntity.ok(documentResponse);
     }
 
+
+    @PutMapping
+    public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
+                                    @RequestPart Map<String, Object> metadata) {
+        Document document = new Document();
+        try {
+            document.setContent(file.getInputStream().readAllBytes());
+        } catch (IOException e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
+        document.setName(file.getOriginalFilename());
+        document.setContentType(file.getContentType());
+        document.setMetadata(metadata);
+
+        document = documentService.create(document);
+        objectStoreService.saveDocumentContent(document);
+
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setDocument(document);
+
+        documentWorkflowManager.createWorkflow(document);
+
+        return ResponseEntity.ok(documentResponse);
+    }
+
     @PostMapping("/ask")
     public ResponseEntity<?> ask(@RequestBody DocumentSearchRequest request) {
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-        response.setAnswer(documentService.ask(request.getQuestion()));
+        response.setAnswer(documentSearchService.vectorSearch(request.getQuestion()));
 
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/search")
     public ResponseEntity<?> search(@RequestBody DocumentSearchRequest request) {
-        return ResponseEntity.ok(documentService.search(request.getQuery()));
+        return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getQuery()));
     }
 
     @GetMapping("/metadata")

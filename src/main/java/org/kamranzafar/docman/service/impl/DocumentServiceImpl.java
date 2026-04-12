@@ -19,57 +19,29 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.kamranzafar.docman.exception.DocmanException;
-import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
-import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
-import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch._types.query_dsl.Query;
-import org.opensearch.client.opensearch.core.SearchRequest;
-import org.opensearch.client.opensearch.core.SearchResponse;
-import org.opensearch.client.opensearch.core.search.FieldCollapse;
-import org.opensearch.client.opensearch.core.search.Hit;
-import org.opensearch.client.opensearch.core.search.SourceConfig;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
-    @Value(value = "${spring.ai.vectorstore.opensearch.index-name}")
-    private String indexName;
-
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
-    @Autowired
-    private VectorStore vectorStore;
-    @Autowired
-    private OpenSearchClient openSearchClient;
-    private final ChatClient chatClient;
-
-    public DocumentServiceImpl(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
-    }
 
     @Transactional
     @Override
     public Document create(Document document) {
         document.setId(UUID.randomUUID());
+
+        log.info("Creating a new document with id {}", document.getId());
 
         return saveDocument(document, DocumentStatus.CREATED.name());
     }
@@ -77,6 +49,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional
     @Override
     public Document update(Document document) {
+        log.info("Updating a document with id {}", document.getId());
         return saveDocument(document, DocumentStatus.UPDATED.name());
     }
 
@@ -93,64 +66,18 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional
     @Override
     public Document delete(Document document) {
+        log.info("Deleting document with id {}", document.getId());
         return null;
     }
 
     @Override
     public Document findMetadata(UUID id) {
+        log.info("Finding document metadata with id {}", id);
         Optional<Document> op = documentMetadataRepository.findById(id);
         if (op.isEmpty()) {
             throw new RuntimeException("Document not found");
         }
 
         return op.get();
-    }
-
-    @Override
-    public String ask(String question) {
-        log.debug("Vector search with prompt {}", question);
-
-        ChatResponse response = chatClient.prompt()
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
-                .user(question)
-                .call()
-                .chatResponse();
-
-        if (response != null) {
-            return response.getResult().getOutput().getText();
-        }
-
-        return null;
-    }
-
-    @Override
-    public List<Object> search(String query) {
-        log.debug("Searching for documents with query {}", query);
-
-        SearchRequest request = SearchRequest.of(s -> s
-                .index(indexName)
-                .query(Query.of(q -> q.queryString(qs -> qs.query(query))))
-                .collapse(FieldCollapse.of(fc -> fc.field(QueryConstants.QUERY_COLLAPSE_FIELD)))
-                .source(SourceConfig.of(sc ->
-                        sc.filter(sf -> sf.includes(QueryConstants.QUERY_SOURCE_INCLUDE))))
-        );
-
-        try {
-            SearchResponse<Object> response = openSearchClient.search(request, Object.class);
-
-            if (response.hits().hits().isEmpty()) {
-                throw new DocumentNotFoundException("No matching document(s) found");
-            }
-
-            List<Object> documents = new ArrayList<>();
-            for (Hit<Object> hit : response.hits().hits()) {
-                log.info("Document found {}", hit.source());
-                documents.add(hit.source());
-            }
-
-            return documents;
-        } catch (IOException e) {
-            throw new DocmanException("Failed to search documents", e);
-        }
     }
 }

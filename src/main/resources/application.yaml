@@ -1,12 +1,12 @@
 server:
   port: 8081
 minio:
-  address: http://localhost:9222
+  address: http://localhost:9000
   user: minioadmin
   password: minioadmin
   bucket: docman
   presigned:
-    upload-url-expiry: 300
+    upload-url-expiry: 3600
     download-url-expiry: 300
 kafka:
   address: localhost:9092

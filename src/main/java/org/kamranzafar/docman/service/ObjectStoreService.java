@@ -17,9 +17,14 @@
 package org.kamranzafar.docman.service;
 
 import org.kamranzafar.docman.model.Document;
+import org.springframework.core.io.InputStreamResource;
 
 public interface ObjectStoreService {
     boolean documentExists(Document document);
+
+    void saveDocumentContent(Document document);
+
+    InputStreamResource getDocumentContent(Document document);
 
     String presignedDownloadUrl(Document document);
 

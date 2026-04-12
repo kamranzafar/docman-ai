@@ -17,15 +17,17 @@
 package org.kamranzafar.docman.service.impl;
 
 import io.minio.*;
-import io.minio.errors.*;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -53,6 +55,34 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
             return true;
         } catch (ErrorResponseException e) {
             return false;
+        } catch (Throwable e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void saveDocumentContent(Document document) {
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(minioBucket)
+                    .object(String.format("%s/%s", document.getId(), document.getName()))
+                    .contentType(document.getContentType())
+                    .stream(new ByteArrayInputStream(document.getContent()),
+                            document.getContent().length, -1)
+                    .build());
+        } catch (Throwable e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public InputStreamResource getDocumentContent(Document document) {
+        try {
+            return new InputStreamResource(
+                    minioClient.getObject(GetObjectArgs.builder()
+                            .bucket(minioBucket)
+                            .object(String.format("%s/%s", document.getId(), document.getName()))
+                            .build()));
         } catch (Throwable e) {
             throw new DocmanException(e.getMessage(), e);
         }
