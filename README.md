@@ -1,5 +1,5 @@
 # Docman AI
-A reference implementation of AI enabled document management system and knowledge base.
+A reference implementation of AI enabled document management system and RAG knowledge base.
 
 ## Technology Stack
 - Spring Boot for REST
