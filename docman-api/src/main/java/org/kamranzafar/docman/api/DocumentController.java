@@ -133,16 +133,16 @@ public class DocumentController {
         return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getFilters()));
     }
 
-    @GetMapping("/metadata")
-    public ResponseEntity<?> getMetadata(@RequestParam String id) {
+    @GetMapping("/metadata/{id}")
+    public ResponseEntity<?> getMetadata(@PathVariable String id) {
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
         response.setDocuments(Collections.singletonList(documentService.findMetadata(parseId(id))));
 
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/content")
-    public ResponseEntity<?> getContent(@RequestParam String id) {
+    @GetMapping("/content/{id}")
+    public ResponseEntity<?> getContent(@PathVariable String id) {
         DocumentDto document = documentService.findMetadata(parseId(id));
         String url = objectStoreService.presignedDownloadUrl(document);
 
@@ -152,8 +152,8 @@ public class DocumentController {
         return ResponseEntity.ok(documentResponse);
     }
 
-    @DeleteMapping
-    public ResponseEntity<?> delete(@RequestParam String id) {
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable String id) {
         DocumentDto document = documentService.findMetadata(parseId(id));
 
         documentWorkflowManager.terminateWorkflow(document.getId());

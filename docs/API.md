@@ -130,9 +130,9 @@ Max upload size: 100MB (`spring.servlet.multipart.max-file-size`/`max-request-si
 
 ---
 
-## `GET /document/metadata?id={id}` — fetch a document's metadata
+## `GET /document/metadata/{id}` — fetch a document's metadata
 
-**Query parameter**: `id` — the document UUID.
+**Path parameter**: `id` — the document UUID.
 
 **Response** `200 OK` (`DocumentSearchResponse`):
 
@@ -143,14 +143,14 @@ Max upload size: 100MB (`spring.servlet.multipart.max-file-size`/`max-request-si
 **Errors**: `404` if the id doesn't exist, `400` if it's not a valid UUID.
 
 ```shell
-curl "http://localhost:8088/document/metadata?id=a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8088/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 ```
 
 ---
 
-## `GET /document/content?id={id}` — get a presigned download URL
+## `GET /document/content/{id}` — get a presigned download URL
 
-**Query parameter**: `id` — the document UUID.
+**Path parameter**: `id` — the document UUID.
 
 **Response** `200 OK`:
 
@@ -164,7 +164,7 @@ The URL is signed for `GET` only and expires after `minio.presigned.download-url
 MinIO, not through the Docman API.
 
 ```shell
-curl "http://localhost:8088/document/content?id=a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8088/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 # then:
 curl "<returned url>" -o invoice-123.pdf
 ```
@@ -248,7 +248,7 @@ curl -X POST http://localhost:8088/document/search \
 
 ---
 
-## `DELETE /document?id={id}` — delete a document
+## `DELETE /document/{id}` — delete a document
 
 Tears down everything associated with a document:
 
@@ -257,7 +257,7 @@ Tears down everything associated with a document:
 3. Removes its content from MinIO
 4. Removes its record from MongoDB
 
-**Query parameter**: `id` — the document UUID.
+**Path parameter**: `id` — the document UUID.
 
 **Response**: `204 No Content` on success.
 
@@ -266,22 +266,22 @@ whose workflow already finished, or whose content was never uploaded, is handled
 are no-ops for the respective cleanup step, not errors).
 
 ```shell
-curl -X DELETE "http://localhost:8088/document?id=a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl -X DELETE "http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 ```
 
 ---
 
 ## Endpoint summary
 
-| Method   | Path                | Purpose                                      |
-|----------|---------------------|-----------------------------------------------|
-| `POST`   | `/document`         | Create + presigned upload URL                 |
-| `PUT`    | `/document`          | Create + direct multipart upload              |
-| `GET`    | `/document/metadata` | Fetch document metadata                       |
-| `GET`    | `/document/content`   | Presigned download URL                        |
-| `POST`   | `/document/ask`        | RAG question answering                        |
+| Method   | Path                     | Purpose                                      |
+|----------|--------------------------|-----------------------------------------------|
+| `POST`   | `/document`              | Create + presigned upload URL                 |
+| `PUT`    | `/document`              | Create + direct multipart upload              |
+| `GET`    | `/document/metadata/{id}` | Fetch document metadata                       |
+| `GET`    | `/document/content/{id}`  | Presigned download URL                        |
+| `POST`   | `/document/ask`          | RAG question answering                        |
 | `POST`   | `/document/search`      | Structured metadata search                    |
-| `DELETE` | `/document`               | Delete document (full cleanup)                |
+| `DELETE` | `/document/{id}`         | Delete document (full cleanup)                |
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/
 OpenSearch debug requests) is in the `bruno/` directory at the repository root.
