@@ -22,7 +22,7 @@ import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.QueryConstants;
-import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
+import org.kamranzafar.docman.repository.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.ai.reader.tika.TikaDocumentReader;

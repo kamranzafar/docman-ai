@@ -22,7 +22,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
-@EnableMongoRepositories(basePackages = "org.kamranzafar.docman.repository.mongo")
+@EnableMongoRepositories(basePackages = "org.kamranzafar.docman.repository")
 @SpringBootApplication(exclude = {ElasticsearchDataAutoConfiguration.class})
 public class Application {
     public static void main(String[] args) {

@@ -45,10 +45,12 @@ Run the docker compose to download and setup all the required containers.
 docker-compose -f docker/docker-compose.yml up
 ```
 
-Once all the containers are running, start the docman application.
+Once all the containers are running, start the docman application. This is a multi-module Maven
+project (`domain-api`, `docman-domain`, `docman-persistence`, `docman-workflow`, `docman-service`);
+the runnable Spring Boot app lives in `docman-service`, so run it from there:
 
 ```shell
-mvn spring-boot:run
+mvn -pl docman-service -am spring-boot:run
 ```
 
 There is a bruno collection included in the project tha can be used to call the Docman REST API.

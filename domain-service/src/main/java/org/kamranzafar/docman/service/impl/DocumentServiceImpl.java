@@ -25,7 +25,7 @@ import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentRequest;
 import org.kamranzafar.docman.model.DocumentStatus;
-import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
+import org.kamranzafar.docman.repository.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
