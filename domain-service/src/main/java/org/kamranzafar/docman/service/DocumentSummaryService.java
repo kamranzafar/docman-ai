@@ -15,22 +15,10 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.wf;
+package org.kamranzafar.docman.service;
 
-import io.temporal.activity.ActivityInterface;
-import io.temporal.activity.ActivityMethod;
-import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
 
-@ActivityInterface
-public interface DocumentActivities {
-    @ActivityMethod
-    Document update(Document document);
-    @ActivityMethod
-    boolean checkUploadStatus(Document document);
-    @ActivityMethod
-    void index(Document document);
-    @ActivityMethod
-    String generateSummary(Document document);
-    @ActivityMethod
-    void notify(String documentId, String msg);
+public interface DocumentSummaryService {
+    String generateSummary(DocumentDto document);
 }
