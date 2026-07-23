@@ -15,11 +15,11 @@ flowchart LR
     API -->|CRUD| Mongo[(MongoDB)]
     API -->|presigned URL / stream| MinIO[(MinIO)]
     Temporal -->|activities| Workflow[docman-workflow]
-    Workflow --> DomainService[domain-service]
-    DomainService --> Mongo
-    DomainService --> MinIO
-    DomainService -->|embed + index| OpenSearch[(OpenSearch)]
-    DomainService -->|chat + embeddings| Ollama[(Ollama)]
+    Workflow --> DocmanService[docman-service]
+    DocmanService --> Mongo
+    DocmanService --> MinIO
+    DocmanService -->|embed + index| OpenSearch[(OpenSearch)]
+    DocmanService -->|chat + embeddings| Ollama[(Ollama)]
     Workflow -->|events| Kafka[(Kafka)]
 ```
 
@@ -46,7 +46,7 @@ is a compile-time Maven dependency):
 ```mermaid
 flowchart BT
     domain[docman-domain] --> persistence[docman-persistence]
-    domain --> service[domain-service]
+    domain --> service[docman-service]
     persistence --> service
     domain --> workflow[docman-workflow]
     service --> workflow
@@ -58,7 +58,7 @@ flowchart BT
 |-------------------------|-----------------------------------------------------------------------------------------------|
 | **docman-domain**        | The `Document` entity (Mongo-mapped), `DocumentStatus`, all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
 | **docman-persistence**    | `DocumentMetadataRepository` — the Spring Data MongoDB repository for `Document`               |
-| **domain-service**        | Service interfaces *and* implementations: `DocumentService`, `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (Ollama summarization) |
+| **docman-service**        | Service interfaces *and* implementations: `DocumentService`, `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (Ollama summarization) |
 | **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates workflows from the API layer |
 | **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST), exception handling, Kafka/MinIO/executor configuration |
 

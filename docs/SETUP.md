@@ -70,7 +70,7 @@ curl -sk -u admin:SecureP@ssword1 https://localhost:9200/_cluster/health
 
 ## 3. Build the project
 
-This is a 5-module Maven reactor (`docman-domain`, `docman-persistence`, `domain-service`,
+This is a 5-module Maven reactor (`docman-domain`, `docman-persistence`, `docman-service`,
 `docman-workflow`, `docman-api`). Build the whole thing from the repository root:
 
 ```shell
