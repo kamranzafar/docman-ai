@@ -31,5 +31,6 @@ public class Document {
     String name;
     String contentType;
     String status;
+    String documentType;
     Map<String, Object> metadata;
 }
