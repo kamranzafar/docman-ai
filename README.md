@@ -1,56 +1,92 @@
 # Docman AI
-A reference implementation of AI enabled document management system and RAG knowledge base.
 
-## Technology Stack
-- Spring Boot for REST
-- MINIO (Object store)
-- MongoDB (Metadata store)
-- OpenSearch as Vector DB
-- Ollama AI for document insights
-- Temporal for document workflow execution
-- Kafka to emit document workflow events
+A reference implementation of an AI-enabled document management system and RAG (Retrieval-Augmented
+Generation) knowledge base, built as a multi-module Spring Boot application orchestrated by Temporal.
 
-## AI Models
-- nomic-embed-text
-- llama3
+Documents are uploaded to object storage, tracked in MongoDB, and asynchronously processed by a
+Temporal workflow that extracts their text, generates vector embeddings, indexes them for search,
+and produces an AI-generated summary — all without blocking the client that uploaded the document.
 
 ## Features
-- Support for various document types like PDF, DOC, TXT etc.
-- Document upload and download using Pre-signed URLs
-- Vector search queries with user prompts
-- Metadata lexical search queries
 
-## Setup
+- **Document upload**, either directly (multipart) or via presigned URLs against MinIO, so large
+  files can be streamed straight to object storage without passing through the API server
+- **Asynchronous ingestion workflow** (Temporal) that waits for the upload to land, extracts text
+  with Apache Tika, chunks and embeds it, and indexes it — with automatic retries and a durable,
+  thread-cheap wait for slow or delayed uploads
+- **Concurrent AI summarization**: an Ollama (`llama3.1`) call generates a short summary of every
+  ingested document in parallel with indexing, saved back onto the document's metadata; a failed
+  or slow summary never blocks the document from being marked as indexed
+- **Vector search / RAG**: ask natural-language questions and get answers grounded in the indexed
+  document content (`nomic-embed-text` embeddings, OpenSearch as the vector store, `llama3.1` chat)
+- **Structured metadata search**: filter documents by arbitrary metadata fields (including document
+  type and free-form tags) without needing to know OpenSearch's query syntax
+- **Document classification field** (`documentType`) reserved for future automatic classification,
+  already wired into search
+- **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
+  down the MinIO object, the vector store entries, the Mongo record, and cancels any still-running
+  ingestion workflow for that document)
+- **Kafka event notifications** for every stage of a document's ingestion lifecycle
 
-### Install Ollama (MacOS)
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit together, and
+[`docs/API.md`](docs/API.md) for the full REST API reference.
 
-Docman uses Ollama AI to create text embedding and for document vector search
+## Technology Stack
+
+| Concern                  | Technology                          |
+|---------------------------|--------------------------------------|
+| Language / runtime        | Java 21                             |
+| Application framework      | Spring Boot 3.5                     |
+| Object storage             | MinIO                                |
+| Metadata store              | MongoDB                              |
+| Vector store                | OpenSearch                          |
+| Workflow orchestration      | Temporal                             |
+| Eventing                    | Kafka                                |
+| AI inference                | Ollama (`llama3.1`, `nomic-embed-text`) |
+| DTO ↔ entity mapping        | MapStruct                            |
+| Build                        | Maven (multi-module)                |
+
+Full details, including how the five Maven modules divide responsibilities, are in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Quick Start
 
 ```shell
+# 1. Install Ollama and pull the required models
 brew install ollama
-```
-
-Install the following models on Ollama
-
-```shell
 ollama pull nomic-embed-text
-ollama pull llama3
+ollama pull llama3.1
+
+# 2. Start MinIO, MongoDB, OpenSearch, Temporal, and Kafka
+docker-compose -f docker/docker-compose.yml up -d
+
+# 3. Build the whole multi-module project
+mvn clean package
+
+# 4. Run the application (the runnable module is docman-api)
+mvn -pl docman-api -am spring-boot:run
 ```
 
-## Running Docman
+The API is served on `http://localhost:8088` by default (see
+[`docs/SETUP.md`](docs/SETUP.md#configuration-reference) for how to change it, including a note
+about a port clash with the bundled Temporal container).
 
-Run the docker compose to download and setup all the required containers.
+Full setup, configuration, and deployment instructions: [`docs/SETUP.md`](docs/SETUP.md).
 
-```shell
-docker-compose -f docker/docker-compose.yml up
-```
+## Trying the API
 
-Once all the containers are running, start the docman application. This is a multi-module Maven
-project (`domain-api`, `docman-domain`, `docman-persistence`, `docman-workflow`, `docman-service`);
-the runnable Spring Boot app lives in `docman-service`, so run it from there:
+A [Bruno](https://www.usebruno.com/) collection is included in `bruno/` covering every endpoint,
+plus example requests against MinIO, Ollama, and OpenSearch directly for debugging. See
+[`docs/API.md`](docs/API.md) for the full request/response reference if you'd rather use `curl`.
 
-```shell
-mvn -pl docman-service -am spring-boot:run
-```
+## Documentation
 
-There is a bruno collection included in the project tha can be used to call the Docman REST API.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module structure, ingestion workflow, data
+  model, and how search/RAG work
+- [`docs/SETUP.md`](docs/SETUP.md) — prerequisites, local setup, configuration reference, and
+  deployment notes
+- [`docs/API.md`](docs/API.md) — REST API reference with request/response examples
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE).
