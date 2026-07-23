@@ -16,7 +16,7 @@
     </parent>
 
     <modules>
-        <module>domain-service</module>
+        <module>docman-service</module>
         <module>docman-domain</module>
         <module>docman-persistence</module>
         <module>docman-workflow</module>
