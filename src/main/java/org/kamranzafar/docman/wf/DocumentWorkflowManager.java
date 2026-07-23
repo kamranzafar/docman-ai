@@ -23,7 +23,9 @@ import io.temporal.client.WorkflowNotFoundException;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowStub;
 import lombok.extern.slf4j.Slf4j;
+import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -32,12 +34,14 @@ import java.util.UUID;
 @Component
 public class DocumentWorkflowManager {
     private final WorkflowClient workflowClient;
+    private final DocumentMapper documentMapper;
 
-    public DocumentWorkflowManager(WorkflowClient workflowClient) {
+    public DocumentWorkflowManager(WorkflowClient workflowClient, DocumentMapper documentMapper) {
         this.workflowClient = workflowClient;
+        this.documentMapper = documentMapper;
     }
 
-    public WorkflowExecution createWorkflow(Document document) {
+    public WorkflowExecution createWorkflow(DocumentDto document) {
         DocumentWorkflow workflow =
                 workflowClient.newWorkflowStub(
                         DocumentWorkflow.class,
@@ -47,7 +51,8 @@ public class DocumentWorkflowManager {
                                 .build()
                 );
 
-        return WorkflowClient.start(workflow::processDocument, document);
+        Document entity = documentMapper.toEntity(document);
+        return WorkflowClient.start(workflow::processDocument, entity);
     }
 
     public DocumentWorkflow getWorkflow(String id) {

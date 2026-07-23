@@ -36,7 +36,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -62,15 +61,7 @@ public class DocumentController {
 
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody DocumentRequest documentRequest) {
-        Document document = new Document();
-        document.setName(documentRequest.getName());
-        document.setContentType(documentRequest.getContentType());
-
-        Map<String, Object> metadataMap = documentRequest.getMetadata() == null
-                ? new HashMap<>() : new HashMap<>(documentRequest.getMetadata());
-
-        document.setMetadata(metadataMap);
-        document = documentService.create(document);
+        DocumentDto document = documentService.create(documentRequest);
 
         String url = objectStoreService.presignedUploadUrl(document);
         DocumentResponse documentResponse = new DocumentResponse();
@@ -86,12 +77,12 @@ public class DocumentController {
     @PutMapping
     public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
                                     @RequestPart Map<String, Object> metadata) {
-        Document document = new Document();
-        document.setName(file.getOriginalFilename());
-        document.setContentType(file.getContentType());
-        document.setMetadata(metadata);
+        DocumentRequest documentRequest = new DocumentRequest();
+        documentRequest.setName(file.getOriginalFilename());
+        documentRequest.setContentType(file.getContentType());
+        documentRequest.setMetadata(metadata);
 
-        document = documentService.create(document);
+        DocumentDto document = documentService.create(documentRequest);
 
         try {
             objectStoreService.saveDocumentContent(document, file.getInputStream(), file.getSize());
@@ -152,7 +143,7 @@ public class DocumentController {
 
     @GetMapping("/content")
     public ResponseEntity<?> getContent(@RequestParam String id) {
-        Document document = documentService.findMetadata(parseId(id));
+        DocumentDto document = documentService.findMetadata(parseId(id));
         String url = objectStoreService.presignedDownloadUrl(document);
 
         DocumentResponse documentResponse = new DocumentResponse();
@@ -163,7 +154,7 @@ public class DocumentController {
 
     @DeleteMapping
     public ResponseEntity<?> delete(@RequestParam String id) {
-        Document document = documentService.findMetadata(parseId(id));
+        DocumentDto document = documentService.findMetadata(parseId(id));
 
         documentWorkflowManager.terminateWorkflow(document.getId());
         documentIndexService.deleteIndex(document);

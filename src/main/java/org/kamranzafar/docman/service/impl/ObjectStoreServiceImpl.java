@@ -20,7 +20,7 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import org.kamranzafar.docman.exception.DocmanException;
-import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,7 +47,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     private int minioDownloadExpiry;
 
     @Override
-    public boolean documentExists(Document document) {
+    public boolean documentExists(DocumentDto document) {
         try {
             minioClient.statObject(StatObjectArgs.builder()
                     .bucket(minioBucket)
@@ -61,7 +61,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public void saveDocumentContent(Document document, InputStream content, long size) {
+    public void saveDocumentContent(DocumentDto document, InputStream content, long size) {
         try {
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(minioBucket)
@@ -75,7 +75,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public void deleteDocumentContent(Document document) {
+    public void deleteDocumentContent(DocumentDto document) {
         try {
             minioClient.removeObject(RemoveObjectArgs.builder()
                     .bucket(minioBucket)
@@ -87,7 +87,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public InputStreamResource getDocumentContent(Document document) {
+    public InputStreamResource getDocumentContent(DocumentDto document) {
         try {
             return new InputStreamResource(
                     minioClient.getObject(GetObjectArgs.builder()
@@ -100,7 +100,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public String presignedDownloadUrl(Document document) {
+    public String presignedDownloadUrl(DocumentDto document) {
         Map<String, String> reqParams = new HashMap<>();
         reqParams.put(MINIO_RESPONSE_CONTENT_TYPE_KEY, document.getContentType());
 
@@ -119,7 +119,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public String presignedUploadUrl(Document document) {
+    public String presignedUploadUrl(DocumentDto document) {
         try {
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()

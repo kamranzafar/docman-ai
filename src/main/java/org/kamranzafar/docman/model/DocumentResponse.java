@@ -23,5 +23,5 @@ import lombok.Data;
 @Data
 public class DocumentResponse {
     String url;
-    Document document;
+    DocumentDto document;
 }

@@ -18,7 +18,8 @@
 package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.mapper.DocumentMapper;
+import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
@@ -47,10 +48,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     private TokenTextSplitter textSplitter;
     @Autowired
     private VectorStore vectorStore;
+    @Autowired
+    private DocumentMapper documentMapper;
 
     @Transactional
     @Override
-    public void index(Document document) {
+    public void index(DocumentDto document) {
         InputStreamResource documentResource = objectStoreService.getDocumentContent(document);
         TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(documentResource);
         List<org.springframework.ai.document.Document> documents = tikaDocumentReader.get();
@@ -71,12 +74,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             log.info("Added Documents to Vector Store {}", vectorStore.getName());
             document.setStatus(DocumentStatus.INDEXED.name());
 
-            documentMetadataRepository.save(document);
+            documentMetadataRepository.save(documentMapper.toEntity(document));
         }
     }
 
     @Override
-    public void deleteIndex(Document document) {
+    public void deleteIndex(DocumentDto document) {
         Filter.Expression filter = new FilterExpressionBuilder()
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();

@@ -17,16 +17,17 @@
 
 package org.kamranzafar.docman.service;
 
-import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
+import org.kamranzafar.docman.model.DocumentRequest;
 
 import java.util.UUID;
 
 public interface DocumentService {
-    Document create(Document document);
+    DocumentDto create(DocumentRequest request);
 
-    Document update(Document document);
+    DocumentDto update(DocumentDto document);
 
-    Document delete(Document document);
+    void delete(DocumentDto document);
 
-    Document findMetadata(UUID id);
+    DocumentDto findMetadata(UUID id);
 }
