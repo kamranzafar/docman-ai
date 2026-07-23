@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.repository.mongo;
+package org.kamranzafar.docman.repository;
 
 import org.kamranzafar.docman.model.Document;
 import org.springframework.data.mongodb.repository.MongoRepository;
