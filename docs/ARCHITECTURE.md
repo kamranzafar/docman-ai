@@ -46,8 +46,7 @@ is a compile-time Maven dependency):
 ```mermaid
 flowchart BT
     domain[docman-domain] --> persistence[docman-persistence]
-    domain --> service[docman-service]
-    persistence --> service
+    persistence --> service[docman-service]
     domain --> workflow[docman-workflow]
     service --> workflow
     service --> api[docman-api]
