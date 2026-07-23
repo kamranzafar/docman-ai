@@ -23,6 +23,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 @Configuration
 public class DocmanConfig {
     @Value(value = "${minio.address}")
@@ -43,5 +46,12 @@ public class DocmanConfig {
     @Bean
     public TokenTextSplitter tokenTextSplitter() {
         return new TokenTextSplitter();
+    }
+
+    // Bounded and separate from Tomcat's request-handling pool, so slow Ollama
+    // calls (which can take minutes on CPU-only inference) don't exhaust it.
+    @Bean
+    public Executor askExecutor() {
+        return Executors.newFixedThreadPool(10);
     }
 }

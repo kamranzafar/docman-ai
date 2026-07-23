@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8088
 minio:
   address: http://localhost:9000
   user: minioadmin
@@ -23,6 +23,10 @@ spring:
     mongodb:
       host: localhost
       port: 27017
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
   temporal:
     connection:
       target: localhost:7233
@@ -37,7 +41,7 @@ spring:
         password: SecureP@ssword1
         initialize-schema: true
         index-name: docman-vector-index
-        dimensions: 1536
+        dimensions: 768
         similarity: cosinesimil
     ollama:
       base-url: http://localhost:11434/
@@ -45,7 +49,7 @@ spring:
         options:
           model: nomic-embed-text
       chat:
-        model: llama3
+        model: llama3.1
         temperature: 1
         max-file-size: -1
         options:

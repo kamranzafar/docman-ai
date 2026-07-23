@@ -17,15 +17,21 @@
 
 package org.kamranzafar.docman.api;
 
+import jakarta.validation.Valid;
 import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.*;
+import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentSearchService;
 import org.kamranzafar.docman.service.DocumentService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.kamranzafar.docman.wf.DocumentWorkflowManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -33,10 +39,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 @RestController
 @RequestMapping("/document")
 public class DocumentController {
+    private static final long ASK_TIMEOUT_MS = 650_000;
+
     @Autowired
     private DocumentService documentService;
     @Autowired
@@ -44,10 +53,15 @@ public class DocumentController {
     @Autowired
     private ObjectStoreService objectStoreService;
     @Autowired
+    private DocumentIndexService documentIndexService;
+    @Autowired
     private DocumentWorkflowManager documentWorkflowManager;
+    @Autowired
+    @Qualifier("askExecutor")
+    private Executor askExecutor;
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody DocumentRequest documentRequest) {
+    public ResponseEntity<?> create(@Valid @RequestBody DocumentRequest documentRequest) {
         Document document = new Document();
         document.setName(documentRequest.getName());
         document.setContentType(documentRequest.getContentType());
@@ -73,17 +87,17 @@ public class DocumentController {
     public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
                                     @RequestPart Map<String, Object> metadata) {
         Document document = new Document();
-        try {
-            document.setContent(file.getInputStream().readAllBytes());
-        } catch (IOException e) {
-            throw new DocmanException(e.getMessage(), e);
-        }
         document.setName(file.getOriginalFilename());
         document.setContentType(file.getContentType());
         document.setMetadata(metadata);
 
         document = documentService.create(document);
-        objectStoreService.saveDocumentContent(document);
+
+        try {
+            objectStoreService.saveDocumentContent(document, file.getInputStream(), file.getSize());
+        } catch (IOException e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
 
         DocumentResponse documentResponse = new DocumentResponse();
         documentResponse.setDocument(document);
@@ -94,34 +108,76 @@ public class DocumentController {
     }
 
     @PostMapping("/ask")
-    public ResponseEntity<?> ask(@RequestBody DocumentSearchRequest request) {
-        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-        response.setAnswer(documentSearchService.vectorSearch(request.getQuestion()));
+    public DeferredResult<ResponseEntity<?>> ask(@RequestBody DocumentSearchRequest request) {
+        if (!StringUtils.hasText(request.getQuestion())) {
+            throw new DocmanException("Question is mandatory");
+        }
 
-        return ResponseEntity.ok(response);
+        DeferredResult<ResponseEntity<?>> deferredResult = new DeferredResult<>(ASK_TIMEOUT_MS);
+        deferredResult.onTimeout(() -> deferredResult.setErrorResult(
+                ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("Question answering timed out")));
+
+        askExecutor.execute(() -> {
+            try {
+                DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+                response.setAnswer(documentSearchService.vectorSearch(request.getQuestion()));
+                deferredResult.setResult(ResponseEntity.ok(response));
+            } catch (RuntimeException e) {
+                deferredResult.setErrorResult(e);
+            }
+        });
+
+        return deferredResult;
     }
 
     @PostMapping("/search")
     public ResponseEntity<?> search(@RequestBody DocumentSearchRequest request) {
-        return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getQuery()));
+        if (request.getFilters() == null || request.getFilters().isEmpty()) {
+            throw new DocmanException("At least one metadata filter is mandatory");
+        }
+        if (request.getFilters().size() > QueryConstants.QUERY_MAX_FILTERS) {
+            throw new DocmanException("Filters exceed maximum count of " + QueryConstants.QUERY_MAX_FILTERS);
+        }
+
+        return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getFilters()));
     }
 
     @GetMapping("/metadata")
-    public ResponseEntity<?> getMetadata(@RequestBody DocumentSearchRequest request) {
+    public ResponseEntity<?> getMetadata(@RequestParam String id) {
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-        response.setDocuments(Collections.singletonList(documentService.findMetadata(UUID.fromString(request.getId()))));
+        response.setDocuments(Collections.singletonList(documentService.findMetadata(parseId(id))));
 
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/content")
-    public ResponseEntity<?> getContent(@RequestBody DocumentSearchRequest request) {
-        Document document = documentService.findMetadata(UUID.fromString(request.getId()));
+    public ResponseEntity<?> getContent(@RequestParam String id) {
+        Document document = documentService.findMetadata(parseId(id));
         String url = objectStoreService.presignedDownloadUrl(document);
 
         DocumentResponse documentResponse = new DocumentResponse();
         documentResponse.setUrl(url);
 
         return ResponseEntity.ok(documentResponse);
+    }
+
+    @DeleteMapping
+    public ResponseEntity<?> delete(@RequestParam String id) {
+        Document document = documentService.findMetadata(parseId(id));
+
+        documentWorkflowManager.terminateWorkflow(document.getId());
+        documentIndexService.deleteIndex(document);
+        objectStoreService.deleteDocumentContent(document);
+        documentService.delete(document);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    private UUID parseId(String id) {
+        try {
+            return UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            throw new DocmanException("Invalid document id: " + id);
+        }
     }
 }

@@ -27,7 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -61,14 +61,25 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
     }
 
     @Override
-    public void saveDocumentContent(Document document) {
+    public void saveDocumentContent(Document document, InputStream content, long size) {
         try {
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(minioBucket)
                     .object(String.format("%s/%s", document.getId(), document.getName()))
                     .contentType(document.getContentType())
-                    .stream(new ByteArrayInputStream(document.getContent()),
-                            document.getContent().length, -1)
+                    .stream(content, size, -1)
+                    .build());
+        } catch (Throwable e) {
+            throw new DocmanException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void deleteDocumentContent(Document document) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(minioBucket)
+                    .object(String.format("%s/%s", document.getId(), document.getName()))
                     .build());
         } catch (Throwable e) {
             throw new DocmanException(e.getMessage(), e);
@@ -96,7 +107,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
         try {
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
-                            .method(Method.PUT)
+                            .method(Method.GET)
                             .bucket(minioBucket)
                             .object(String.format("%s/%s", document.getId(), document.getName()))
                             .expiry(minioDownloadExpiry)
@@ -112,7 +123,7 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
         try {
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
+                            .method(Method.PUT)
                             .bucket(minioBucket)
                             .object(String.format("%s/%s", document.getId(), document.getName()))
                             .expiry(minioUploadExpiry)

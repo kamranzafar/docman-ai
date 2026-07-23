@@ -20,12 +20,15 @@ package org.kamranzafar.docman.service.impl;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
+import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
@@ -70,5 +73,15 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
             documentMetadataRepository.save(document);
         }
+    }
+
+    @Override
+    public void deleteIndex(Document document) {
+        Filter.Expression filter = new FilterExpressionBuilder()
+                .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
+                .build();
+
+        vectorStore.delete(filter);
+        log.info("Deleted vector store entries for document {}", document.getId());
     }
 }

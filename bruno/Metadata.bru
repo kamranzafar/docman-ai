@@ -5,15 +5,13 @@ meta {
 }
 
 get {
-  url: http://localhost:8081/document/metadata
-  body: json
+  url: http://localhost:8081/document/metadata?id=f102f673-dc48-46d7-9f50-a2526bf80992
+  body: none
   auth: inherit
 }
 
-body:json {
-  {
-    "id":"f102f673-dc48-46d7-9f50-a2526bf80992"
-  }
+params:query {
+  id: f102f673-dc48-46d7-9f50-a2526bf80992
 }
 
 settings {

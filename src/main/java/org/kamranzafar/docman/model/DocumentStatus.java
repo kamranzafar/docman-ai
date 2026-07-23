@@ -18,5 +18,5 @@
 package org.kamranzafar.docman.model;
 
 public enum DocumentStatus {
-    CREATED, UPLOADED, UPDATED, INDEXED
+    CREATED, UPLOADED, UPDATED, INDEXED, FAILED
 }

@@ -19,12 +19,16 @@ package org.kamranzafar.docman.wf;
 
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowNotFoundException;
 import io.temporal.client.WorkflowOptions;
+import io.temporal.client.WorkflowStub;
+import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class DocumentWorkflowManager {
     private final WorkflowClient workflowClient;
@@ -38,7 +42,7 @@ public class DocumentWorkflowManager {
                 workflowClient.newWorkflowStub(
                         DocumentWorkflow.class,
                         WorkflowOptions.newBuilder()
-                                .setWorkflowId(String.format("doc-wf-%s", UUID.randomUUID()))
+                                .setWorkflowId(workflowId(document.getId()))
                                 .setTaskQueue("documents")
                                 .build()
                 );
@@ -48,5 +52,18 @@ public class DocumentWorkflowManager {
 
     public DocumentWorkflow getWorkflow(String id) {
         return workflowClient.newWorkflowStub(DocumentWorkflow.class, id);
+    }
+
+    public void terminateWorkflow(UUID documentId) {
+        try {
+            WorkflowStub.fromTyped(getWorkflow(workflowId(documentId)))
+                    .terminate("Document deleted");
+        } catch (WorkflowNotFoundException e) {
+            log.debug("No workflow found for document {} (already completed or never started)", documentId);
+        }
+    }
+
+    private String workflowId(UUID documentId) {
+        return String.format("doc-wf-%s", documentId);
     }
 }

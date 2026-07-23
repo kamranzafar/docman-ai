@@ -19,6 +19,7 @@ package org.kamranzafar.docman.wf.impl;
 
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ApplicationFailure;
 import io.temporal.spring.boot.WorkflowImpl;
 import io.temporal.workflow.Async;
 import io.temporal.workflow.Workflow;
@@ -36,7 +37,11 @@ import java.util.function.Supplier;
 @Service
 @WorkflowImpl(taskQueues = "documents")
 public class DocumentWorkflowImpl implements DocumentWorkflow {
+    private static final Duration UPLOAD_POLL_INTERVAL = Duration.ofSeconds(5);
+    private static final Duration MAX_UPLOAD_WAIT = Duration.ofMinutes(15);
+
     private final Supplier<DocumentActivities> activities;
+    private final Supplier<DocumentActivities> uploadCheckActivities;
 
     public DocumentWorkflowImpl() {
         this.activities = () -> Workflow.newActivityStub(
@@ -49,30 +54,65 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                                 .build())
                         .build()
         );
+        // checkUploadStatus is a single, fast poll now (no in-activity loop), so it
+        // gets its own short-timeout stub rather than parking a worker thread for
+        // the entire upload wait window.
+        this.uploadCheckActivities = () -> Workflow.newActivityStub(
+                DocumentActivities.class,
+                ActivityOptions.newBuilder()
+                        .setStartToCloseTimeout(Duration.ofSeconds(10))
+                        .setRetryOptions(RetryOptions.newBuilder()
+                                .setMaximumAttempts(3)
+                                .setInitialInterval(Duration.ofSeconds(1))
+                                .build())
+                        .build()
+        );
     }
 
     @Override
     public void processDocument(Document document) {
         DocumentActivities activity = activities.get();
 
-        activity.notify(document.getId().toString(), "Document Created");
+        try {
+            activity.notify(document.getId().toString(), "Document Created");
 
-        activity.checkUploadStatus(document);
+            waitForUpload(document);
 
-        document.setStatus(DocumentStatus.UPLOADED.name());
+            document.setStatus(DocumentStatus.UPLOADED.name());
 
-        Async.function(() -> {
+            Async.function(() -> {
+                activity.update(document);
+                return null;
+            }).get();
+
+            activity.notify(document.getId().toString(), "Document Content Uploaded");
+
+            Async.function(() -> {
+                activity.index(document);
+                return null;
+            }).get();
+
+            activity.notify(document.getId().toString(), "Document Indexed");
+        } catch (RuntimeException e) {
+            document.setStatus(DocumentStatus.FAILED.name());
             activity.update(document);
-            return null;
-        }).get();
+            activity.notify(document.getId().toString(), "Document Processing Failed: " + e.getMessage());
+            throw e;
+        }
+    }
 
-        activity.notify(document.getId().toString(), "Document Content Uploaded");
+    private void waitForUpload(Document document) {
+        DocumentActivities uploadCheckActivity = uploadCheckActivities.get();
+        long maxAttempts = MAX_UPLOAD_WAIT.toMillis() / UPLOAD_POLL_INTERVAL.toMillis();
 
-        Async.function(() -> {
-            activity.index(document);
-            return null;
-        }).get();
+        for (long attempt = 0; attempt < maxAttempts; attempt++) {
+            if (uploadCheckActivity.checkUploadStatus(document)) {
+                return;
+            }
+            Workflow.sleep(UPLOAD_POLL_INTERVAL);
+        }
 
-        activity.notify(document.getId().toString(), "Document Indexed");
+        throw ApplicationFailure.newNonRetryableFailure(
+                "Document content was not uploaded within " + MAX_UPLOAD_WAIT, "UploadTimeout");
     }
 }

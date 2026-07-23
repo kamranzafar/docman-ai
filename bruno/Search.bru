@@ -12,7 +12,9 @@ post {
 
 body:json {
   {
-    "query":"metadata.type:ID_DOC"
+    "filters": {
+      "type": "ID_DOC"
+    }
   }
 }
 

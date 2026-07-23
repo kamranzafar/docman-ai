@@ -17,8 +17,9 @@
 package org.kamranzafar.docman.service;
 
 import java.util.List;
+import java.util.Map;
 
 public interface DocumentSearchService {
     String vectorSearch(String question);
-    List<Object> lexicalSearch(String query);
+    List<Object> lexicalSearch(Map<String, Object> filters);
 }

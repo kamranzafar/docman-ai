@@ -19,6 +19,7 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
@@ -50,7 +51,8 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document update(Document document) {
         log.info("Updating a document with id {}", document.getId());
-        return saveDocument(document, DocumentStatus.UPDATED.name());
+        String status = document.getStatus() != null ? document.getStatus() : DocumentStatus.UPDATED.name();
+        return saveDocument(document, status);
     }
 
     @NotNull
@@ -67,7 +69,8 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document delete(Document document) {
         log.info("Deleting document with id {}", document.getId());
-        return null;
+        documentMetadataRepository.deleteById(document.getId());
+        return document;
     }
 
     @Override
@@ -75,7 +78,7 @@ public class DocumentServiceImpl implements DocumentService {
         log.info("Finding document metadata with id {}", id);
         Optional<Document> op = documentMetadataRepository.findById(id);
         if (op.isEmpty()) {
-            throw new RuntimeException("Document not found");
+            throw new DocumentNotFoundException("Document not found");
         }
 
         return op.get();

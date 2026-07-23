@@ -17,7 +17,6 @@
 
 package org.kamranzafar.docman.wf.impl;
 
-import io.temporal.activity.Activity;
 import io.temporal.spring.boot.ActivityImpl;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.service.DocumentIndexService;
@@ -52,21 +51,7 @@ public class DocumentActivitiesImpl implements DocumentActivities {
 
     @Override
     public boolean checkUploadStatus(Document document) {
-        while (true) {
-            if (objectStoreService.documentExists(document)) {
-                return true;
-            }
-
-            Activity.getExecutionContext().heartbeat(document);
-
-            try {
-                // Sleep for the poll interval
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw Activity.wrap(e);
-            }
-        }
+        return objectStoreService.documentExists(document);
     }
 
     @Override

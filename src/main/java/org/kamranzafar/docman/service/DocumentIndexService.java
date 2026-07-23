@@ -21,4 +21,6 @@ import org.kamranzafar.docman.model.Document;
 
 public interface DocumentIndexService {
     void index(Document document);
+
+    void deleteIndex(Document document);
 }

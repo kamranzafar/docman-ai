@@ -22,6 +22,7 @@ import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentSearchService;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.FieldValue;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.SearchRequest;
 import org.opensearch.client.opensearch.core.SearchResponse;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -73,12 +75,17 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
     }
 
     @Override
-    public List<Object> lexicalSearch(String query) {
-        log.info("Searching for documents with query '{}'", query);
+    public List<Object> lexicalSearch(Map<String, Object> filters) {
+        log.info("Searching for documents with filters {}", filters);
 
         SearchRequest request = SearchRequest.of(s -> s
                 .index(indexName)
-                .query(Query.of(q -> q.queryString(qs -> qs.query(query))))
+                .query(Query.of(q -> q.bool(b -> {
+                    filters.forEach((key, value) -> b.must(m -> m.match(mm -> mm
+                            .field(QueryConstants.QUERY_METADATA_FIELD_PREFIX + key)
+                            .query(FieldValue.of(String.valueOf(value))))));
+                    return b;
+                })))
                 .collapse(FieldCollapse.of(fc -> fc.field(QueryConstants.QUERY_COLLAPSE_FIELD)))
                 .source(SourceConfig.of(sc ->
                         sc.filter(sf -> sf.includes(QueryConstants.QUERY_SOURCE_INCLUDE))))

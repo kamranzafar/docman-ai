@@ -20,10 +20,11 @@ package org.kamranzafar.docman.model;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.Map;
+
 @Data
 @Builder
 public class DocumentSearchRequest {
-    String id;
-    String query;
+    Map<String, Object> filters;
     String question;
 }

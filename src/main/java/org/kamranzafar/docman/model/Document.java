@@ -17,10 +17,8 @@
 
 package org.kamranzafar.docman.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 
 import java.util.Map;
 import java.util.UUID;
@@ -34,7 +32,4 @@ public class Document {
     String contentType;
     String status;
     Map<String, Object> metadata;
-    @Transient
-    @JsonIgnore
-    byte[] content;
 }

@@ -19,10 +19,14 @@ package org.kamranzafar.docman.service;
 import org.kamranzafar.docman.model.Document;
 import org.springframework.core.io.InputStreamResource;
 
+import java.io.InputStream;
+
 public interface ObjectStoreService {
     boolean documentExists(Document document);
 
-    void saveDocumentContent(Document document);
+    void saveDocumentContent(Document document, InputStream content, long size);
+
+    void deleteDocumentContent(Document document);
 
     InputStreamResource getDocumentContent(Document document);
 
