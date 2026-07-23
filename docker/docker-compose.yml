@@ -83,9 +83,9 @@ services:
     networks:
       - docman-network
 
-  docman-admin-tools:
+  docman-temporal-admin-tools:
     image: temporalio/admin-tools:${TEMPORAL_ADMIN_VERSION}
-    container_name: docman-admin-tools
+    container_name: docman-temporal-admin-tools
     depends_on:
       - docman-temporal
     environment:
@@ -95,9 +95,9 @@ services:
     stdin_open: true
     tty: true
 
-  docman-ui:
+  docman-temporal-ui:
     image: temporalio/ui:${TEMPORAL_UI_VERSION}
-    container_name: docman-ui
+    container_name: docman-temporal-ui
     ports:
       - "8080:8080"
     environment:

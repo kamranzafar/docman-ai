@@ -27,5 +27,6 @@ public class DocumentRequest {
     String name;
     @NotBlank(message = "Content Type is mandatory")
     String contentType;
+    String documentType;
     Map<String, Object> metadata;
 }
