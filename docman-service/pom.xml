@@ -21,12 +21,6 @@
     <dependencies>
         <dependency>
             <groupId>org.kamranzafar.docman</groupId>
-            <artifactId>docman-domain</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.kamranzafar.docman</groupId>
             <artifactId>docman-persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
