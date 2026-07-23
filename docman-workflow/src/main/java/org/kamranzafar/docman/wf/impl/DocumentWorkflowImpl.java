@@ -22,15 +22,19 @@ import io.temporal.common.RetryOptions;
 import io.temporal.failure.ApplicationFailure;
 import io.temporal.spring.boot.WorkflowImpl;
 import io.temporal.workflow.Async;
+import io.temporal.workflow.Promise;
 import io.temporal.workflow.Workflow;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
+import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.wf.DocumentActivities;
 import org.kamranzafar.docman.wf.DocumentWorkflow;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -42,6 +46,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
     private final Supplier<DocumentActivities> activities;
     private final Supplier<DocumentActivities> uploadCheckActivities;
+    private final Supplier<DocumentActivities> summaryActivities;
 
     public DocumentWorkflowImpl() {
         this.activities = () -> Workflow.newActivityStub(
@@ -67,6 +72,18 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                                 .build())
                         .build()
         );
+        // Summary generation is an LLM call that can legitimately take minutes on
+        // CPU-only inference, so it gets a long timeout and a single attempt -
+        // retrying a slow-but-working call would just repeat the wait for no benefit.
+        this.summaryActivities = () -> Workflow.newActivityStub(
+                DocumentActivities.class,
+                ActivityOptions.newBuilder()
+                        .setStartToCloseTimeout(Duration.ofMinutes(10))
+                        .setRetryOptions(RetryOptions.newBuilder()
+                                .setMaximumAttempts(1)
+                                .build())
+                        .build()
+        );
     }
 
     @Override
@@ -87,11 +104,33 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
             activity.notify(document.getId().toString(), "Document Content Uploaded");
 
-            Async.function(() -> {
+            // Indexing and summary generation both only need the uploaded content,
+            // so run them concurrently instead of one after the other.
+            Promise<Void> indexPromise = Async.function(() -> {
                 activity.index(document);
                 return null;
-            }).get();
+            });
+            Promise<String> summaryPromise = Async.function(() -> summaryActivities.get().generateSummary(document));
 
+            indexPromise.get();
+            document.setStatus(DocumentStatus.INDEXED.name());
+
+            try {
+                String summary = summaryPromise.get();
+                if (summary != null && !summary.isBlank()) {
+                    Map<String, Object> metadata = document.getMetadata() != null
+                            ? new HashMap<>(document.getMetadata()) : new HashMap<>();
+                    metadata.put(QueryConstants.SUMMARY_METADATA_KEY, summary);
+                    document.setMetadata(metadata);
+                }
+            } catch (RuntimeException e) {
+                // Summary generation is a supplementary enhancement, not core to
+                // ingestion succeeding - don't fail the whole document over it.
+                log.warn("Summary generation failed for document {}: {}", document.getId(), e.getMessage());
+                activity.notify(document.getId().toString(), "Document Summary Generation Failed: " + e.getMessage());
+            }
+
+            activity.update(document);
             activity.notify(document.getId().toString(), "Document Indexed");
         } catch (RuntimeException e) {
             document.setStatus(DocumentStatus.FAILED.name());

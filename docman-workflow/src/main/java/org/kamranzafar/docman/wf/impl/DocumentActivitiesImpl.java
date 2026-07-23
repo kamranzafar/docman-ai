@@ -22,6 +22,7 @@ import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentService;
+import org.kamranzafar.docman.service.DocumentSummaryService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.kamranzafar.docman.wf.DocumentActivities;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,8 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     @Autowired
     private ObjectStoreService objectStoreService;
     @Autowired
+    private DocumentSummaryService documentSummaryService;
+    @Autowired
     private DocumentMapper documentMapper;
 
     @Override
@@ -55,6 +58,11 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     @Override
     public void index(Document document) {
         documentIndexService.index(documentMapper.toDto(document));
+    }
+
+    @Override
+    public String generateSummary(Document document) {
+        return documentSummaryService.generateSummary(documentMapper.toDto(document));
     }
 
     @Override
