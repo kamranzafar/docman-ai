@@ -15,12 +15,21 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.service;
+package org.kamranzafar.docman.mapper;
 
+import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentDto;
+import org.kamranzafar.docman.model.DocumentRequest;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-public interface DocumentIndexService {
-    void index(DocumentDto document);
+@Mapper(componentModel = "spring")
+public interface DocumentMapper {
+    DocumentDto toDto(Document document);
 
-    void deleteIndex(DocumentDto document);
+    Document toEntity(DocumentDto dto);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    Document toEntity(DocumentRequest request);
 }

@@ -16,21 +16,21 @@
 
 package org.kamranzafar.docman.service;
 
-import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
 import org.springframework.core.io.InputStreamResource;
 
 import java.io.InputStream;
 
 public interface ObjectStoreService {
-    boolean documentExists(Document document);
+    boolean documentExists(DocumentDto document);
 
-    void saveDocumentContent(Document document, InputStream content, long size);
+    void saveDocumentContent(DocumentDto document, InputStream content, long size);
 
-    void deleteDocumentContent(Document document);
+    void deleteDocumentContent(DocumentDto document);
 
-    InputStreamResource getDocumentContent(Document document);
+    InputStreamResource getDocumentContent(DocumentDto document);
 
-    String presignedDownloadUrl(Document document);
+    String presignedDownloadUrl(DocumentDto document);
 
-    String presignedUploadUrl(Document document);
+    String presignedUploadUrl(DocumentDto document);
 }

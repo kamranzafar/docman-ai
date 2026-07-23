@@ -24,8 +24,6 @@ import org.kamranzafar.docman.model.Document;
 @ActivityInterface
 public interface DocumentActivities {
     @ActivityMethod
-    Document create(Document document);
-    @ActivityMethod
     Document update(Document document);
     @ActivityMethod
     boolean checkUploadStatus(Document document);

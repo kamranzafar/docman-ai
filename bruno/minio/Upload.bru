@@ -1,0 +1,29 @@
+meta {
+  name: Upload
+  type: http
+  seq: 1
+}
+
+put {
+  url: http://localhost:9000/docman/356a2edd-5e06-44bd-83ae-45099a20972d/test.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20260412%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260412T074634Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=ebe8ab3c7510f547b98f3bad1c4d1a0c2f7587b99cc499fd17e00b4d35bb60a3
+  body: file
+  auth: none
+}
+
+params:query {
+  X-Amz-Algorithm: AWS4-HMAC-SHA256
+  X-Amz-Credential: minioadmin%2F20260412%2Fus-east-1%2Fs3%2Faws4_request
+  X-Amz-Date: 20260412T074634Z
+  X-Amz-Expires: 3600
+  X-Amz-SignedHeaders: host
+  X-Amz-Signature: ebe8ab3c7510f547b98f3bad1c4d1a0c2f7587b99cc499fd17e00b4d35bb60a3
+}
+
+body:file {
+  file: @file(test.txt) @contentType(text/plain; charset=utf-8)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

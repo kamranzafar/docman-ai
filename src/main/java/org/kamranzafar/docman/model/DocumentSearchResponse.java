@@ -27,6 +27,6 @@ import java.util.List;
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DocumentSearchResponse {
-    List<Document> documents;
+    List<DocumentDto> documents;
     String answer;
 }

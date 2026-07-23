@@ -15,12 +15,24 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.service;
+package org.kamranzafar.docman.model;
 
-import org.kamranzafar.docman.model.DocumentDto;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public interface DocumentIndexService {
-    void index(DocumentDto document);
+import java.util.Map;
+import java.util.UUID;
 
-    void deleteIndex(DocumentDto document);
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DocumentDto {
+    UUID id;
+    String name;
+    String contentType;
+    String status;
+    Map<String, Object> metadata;
 }

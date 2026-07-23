@@ -18,6 +18,7 @@
 package org.kamranzafar.docman.wf.impl;
 
 import io.temporal.spring.boot.ActivityImpl;
+import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentService;
@@ -38,25 +39,22 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     private DocumentService documentService;
     @Autowired
     private ObjectStoreService objectStoreService;
-
-    @Override
-    public Document create(Document document) {
-        return documentService.create(document);
-    }
+    @Autowired
+    private DocumentMapper documentMapper;
 
     @Override
     public Document update(Document document) {
-        return documentService.update(document);
+        return documentMapper.toEntity(documentService.update(documentMapper.toDto(document)));
     }
 
     @Override
     public boolean checkUploadStatus(Document document) {
-        return objectStoreService.documentExists(document);
+        return objectStoreService.documentExists(documentMapper.toDto(document));
     }
 
     @Override
     public void index(Document document) {
-        documentIndexService.index(document);
+        documentIndexService.index(documentMapper.toDto(document));
     }
 
     @Override

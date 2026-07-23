@@ -20,7 +20,10 @@ package org.kamranzafar.docman.service.impl;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.kamranzafar.docman.exception.DocumentNotFoundException;
+import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentDto;
+import org.kamranzafar.docman.model.DocumentRequest;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.mongo.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
@@ -28,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,23 +40,30 @@ import java.util.UUID;
 public class DocumentServiceImpl implements DocumentService {
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
+    @Autowired
+    private DocumentMapper documentMapper;
 
     @Transactional
     @Override
-    public Document create(Document document) {
+    public DocumentDto create(DocumentRequest request) {
+        Document document = documentMapper.toEntity(request);
         document.setId(UUID.randomUUID());
+        if (document.getMetadata() == null) {
+            document.setMetadata(new HashMap<>());
+        }
 
         log.info("Creating a new document with id {}", document.getId());
 
-        return saveDocument(document, DocumentStatus.CREATED.name());
+        return documentMapper.toDto(saveDocument(document, DocumentStatus.CREATED.name()));
     }
 
     @Transactional
     @Override
-    public Document update(Document document) {
-        log.info("Updating a document with id {}", document.getId());
+    public DocumentDto update(DocumentDto documentDto) {
+        log.info("Updating a document with id {}", documentDto.getId());
+        Document document = documentMapper.toEntity(documentDto);
         String status = document.getStatus() != null ? document.getStatus() : DocumentStatus.UPDATED.name();
-        return saveDocument(document, status);
+        return documentMapper.toDto(saveDocument(document, status));
     }
 
     @NotNull
@@ -67,20 +78,19 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Transactional
     @Override
-    public Document delete(Document document) {
+    public void delete(DocumentDto document) {
         log.info("Deleting document with id {}", document.getId());
         documentMetadataRepository.deleteById(document.getId());
-        return document;
     }
 
     @Override
-    public Document findMetadata(UUID id) {
+    public DocumentDto findMetadata(UUID id) {
         log.info("Finding document metadata with id {}", id);
         Optional<Document> op = documentMetadataRepository.findById(id);
         if (op.isEmpty()) {
             throw new DocumentNotFoundException("Document not found");
         }
 
-        return op.get();
+        return documentMapper.toDto(op.get());
     }
 }
