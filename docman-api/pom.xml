@@ -21,7 +21,7 @@
     <dependencies>
         <dependency>
             <groupId>org.kamranzafar.docman</groupId>
-            <artifactId>domain-service</artifactId>
+            <artifactId>docman-service</artifactId>
             <version>${project.version}</version>
         </dependency>
 

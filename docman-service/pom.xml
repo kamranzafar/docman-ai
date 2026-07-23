@@ -10,7 +10,7 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>domain-service</artifactId>
+    <artifactId>docman-service</artifactId>
     <packaging>jar</packaging>
 
     <description>
