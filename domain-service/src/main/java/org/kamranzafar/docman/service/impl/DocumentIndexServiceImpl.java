@@ -1,18 +1,17 @@
-/**
- *
- * Copyright 2026 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ *  Copyright 2026 Kamran Zafar
+ *  <p>
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  <p>
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  <p>
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 package org.kamranzafar.docman.service.impl;
@@ -34,8 +33,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -64,9 +66,15 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             assert ragDoc.getMedia() != null;
             assert ragDoc.getText() != null;
 
+            Map<String, Object> indexedMetadata = document.getMetadata() != null
+                    ? new HashMap<>(document.getMetadata()) : new HashMap<>();
+            if (StringUtils.hasText(document.getDocumentType())) {
+                indexedMetadata.put(QueryConstants.DOCUMENT_TYPE_METADATA_KEY, document.getDocumentType());
+            }
+
             org.springframework.ai.document.Document d
                     = new org.springframework.ai.document.Document(
-                    document.getId().toString(), ragDoc.getText(), document.getMetadata());
+                    document.getId().toString(), ragDoc.getText(), indexedMetadata);
 
             List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
 
