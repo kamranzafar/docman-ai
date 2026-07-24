@@ -16,7 +16,7 @@ Every endpoint that returns a document uses this shape (`DocumentDto`):
   "name": "invoice-123.pdf",
   "contentType": "application/pdf",
   "status": "INDEXED",
-  "documentType": "invoice",
+  "documentType": "invoices",
   "metadata": {
     "vendor": "acme",
     "summary": "A short AI-generated summary of the document, added once ingestion completes."
@@ -25,9 +25,14 @@ Every endpoint that returns a document uses this shape (`DocumentDto`):
 ```
 
 `status` is one of `CREATED`, `UPLOADED`, `UPDATED`, `INDEXED`, `FAILED` (see
-[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-lifecycle)). `documentType` is optional,
-free-form, and reserved for classification use. `metadata` is an arbitrary map supplied by the
-caller at creation time; the system adds a `summary` key to it once AI summarization completes.
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-lifecycle)). `documentType` starts out as
+whatever the caller optionally supplied at creation, then gets overwritten once ingestion finishes:
+an AI classification step (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-classification)) assigns one of `statements`,
+`invoices`, `policy documents`, `compliance certificates`, `insurance documents`, `contracts`, or
+`unknown` if the document doesn't clearly match any of those. `metadata` is an arbitrary map
+supplied by the caller at creation time; the system adds a `summary` key to it once AI
+summarization completes.
 
 ### Error responses
 
@@ -74,7 +79,7 @@ from a browser/client without proxying bytes through this API.
 |---------------|----------|-------|
 | `name`        | yes      | Used as part of the object key in MinIO |
 | `contentType` | yes      | Stored and used as the `Content-Type` on download |
-| `documentType`| no       | Free-form classification tag |
+| `documentType`| no       | Initial tag, if supplied; overwritten by AI classification once ingestion completes |
 | `metadata`    | no       | Arbitrary key/value map |
 
 **Response** `200 OK`:
@@ -114,8 +119,8 @@ clients that can't do a separate presigned upload step.
 | `file`     | file          | The document content; its filename and content-type become the document's `name`/`contentType` |
 | `metadata` | `application/json` | Arbitrary key/value map (same as `DocumentRequest.metadata`) |
 
-Note: `documentType` cannot currently be set via this endpoint (only via `POST /document`); it will
-be `null` until set another way.
+Note: `documentType` cannot be supplied via this endpoint (only via `POST /document`); it stays
+`null` until AI classification sets it once ingestion completes.
 
 **Response** `200 OK`: same `DocumentResponse` shape as above, but `status` starts at `CREATED` and
 the workflow (already having its content) proceeds straight through without waiting.
@@ -219,6 +224,12 @@ the OpenSearch field `metadata.k`).
 
 Multiple filters are combined with AND semantics. Maximum 10 filters per request
 (`QueryConstants.QUERY_MAX_FILTERS`).
+
+Note: a `documentType` filter here matches the value present in the chunk's indexed metadata,
+which is a snapshot taken at indexing time — i.e. whatever the caller supplied in `POST /document`,
+not the value the AI classifier assigns afterward (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-classification)). To look up a document's
+AI-classified type, use `GET /document/metadata/{id}` instead.
 
 **Response** `200 OK`: a list of matching chunks' metadata (one entry per indexed chunk, collapsed
 by parent document where possible):

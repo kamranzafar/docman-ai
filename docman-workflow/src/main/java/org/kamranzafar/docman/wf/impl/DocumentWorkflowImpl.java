@@ -27,6 +27,7 @@ import io.temporal.workflow.Workflow;
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentStatus;
+import org.kamranzafar.docman.model.DocumentType;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.wf.DocumentActivities;
 import org.kamranzafar.docman.wf.DocumentWorkflow;
@@ -47,6 +48,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
     private final Supplier<DocumentActivities> activities;
     private final Supplier<DocumentActivities> uploadCheckActivities;
     private final Supplier<DocumentActivities> summaryActivities;
+    private final Supplier<DocumentActivities> classificationActivities;
 
     public DocumentWorkflowImpl() {
         this.activities = () -> Workflow.newActivityStub(
@@ -76,6 +78,17 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
         // CPU-only inference, so it gets a long timeout and a single attempt -
         // retrying a slow-but-working call would just repeat the wait for no benefit.
         this.summaryActivities = () -> Workflow.newActivityStub(
+                DocumentActivities.class,
+                ActivityOptions.newBuilder()
+                        .setStartToCloseTimeout(Duration.ofMinutes(10))
+                        .setRetryOptions(RetryOptions.newBuilder()
+                                .setMaximumAttempts(1)
+                                .build())
+                        .build()
+        );
+        // Classification is also an LLM call over the full document text, so it gets
+        // the same long-timeout, single-attempt treatment as summary generation.
+        this.classificationActivities = () -> Workflow.newActivityStub(
                 DocumentActivities.class,
                 ActivityOptions.newBuilder()
                         .setStartToCloseTimeout(Duration.ofMinutes(10))
@@ -115,6 +128,10 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
             indexPromise.get();
             document.setStatus(DocumentStatus.INDEXED.name());
 
+            // Classification only needs the document to be indexed, not the summary,
+            // so it's kicked off now and awaited later alongside the summary result.
+            Promise<String> classificationPromise = Async.function(() -> classificationActivities.get().classifyDocument(document));
+
             try {
                 String summary = summaryPromise.get();
                 if (summary != null && !summary.isBlank()) {
@@ -132,6 +149,20 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
             activity.update(document);
             activity.notify(document.getId().toString(), "Document Indexed");
+
+            try {
+                String documentType = classificationPromise.get();
+                document.setDocumentType(documentType != null && !documentType.isBlank()
+                        ? documentType : DocumentType.UNKNOWN.getLabel());
+            } catch (RuntimeException e) {
+                // Classification is a supplementary enhancement, not core to
+                // ingestion succeeding - don't fail the whole document over it.
+                log.warn("Classification failed for document {}: {}", document.getId(), e.getMessage());
+                document.setDocumentType(DocumentType.UNKNOWN.getLabel());
+            }
+
+            activity.update(document);
+            activity.notify(document.getId().toString(), "Document Classified: " + document.getDocumentType());
         } catch (RuntimeException e) {
             document.setStatus(DocumentStatus.FAILED.name());
             activity.update(document);

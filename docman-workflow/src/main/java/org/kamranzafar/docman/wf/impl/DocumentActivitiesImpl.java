@@ -20,6 +20,7 @@ package org.kamranzafar.docman.wf.impl;
 import io.temporal.spring.boot.ActivityImpl;
 import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.service.DocumentClassificationService;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentService;
 import org.kamranzafar.docman.service.DocumentSummaryService;
@@ -43,6 +44,8 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     @Autowired
     private DocumentSummaryService documentSummaryService;
     @Autowired
+    private DocumentClassificationService documentClassificationService;
+    @Autowired
     private DocumentMapper documentMapper;
 
     @Override
@@ -63,6 +66,11 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     @Override
     public String generateSummary(Document document) {
         return documentSummaryService.generateSummary(documentMapper.toDto(document));
+    }
+
+    @Override
+    public String classifyDocument(Document document) {
+        return documentClassificationService.classify(documentMapper.toDto(document));
     }
 
     @Override

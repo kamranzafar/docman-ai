@@ -36,6 +36,7 @@ flowchart LR
 | Text extraction              | Apache Tika (via Spring AI)        | Extracts text from PDF/DOC/TXT/etc.                                  |
 | Embeddings                    | Ollama `nomic-embed-text`          | 768-dimension vectors for chunked document text                      |
 | Chat / summarization / RAG      | Ollama `llama3.1`                  | Answers questions (RAG) and generates document summaries             |
+| Document classification         | Ollama `llama3.1` (temperature `0`) + OpenSearch | Assigns `documentType` from a fixed category set, via retrieval over the document's own indexed chunks |
 | DTO ↔ entity mapping              | MapStruct                          | Generates the `Document` ⇄ `DocumentDto`/`DocumentRequest` mappers at compile time |
 
 ## Module Structure
@@ -55,9 +56,9 @@ flowchart BT
 
 | Module                | Contents                                                                                   |
 |-------------------------|-----------------------------------------------------------------------------------------------|
-| **docman-domain**        | The `Document` entity (Mongo-mapped), `DocumentStatus`, all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
+| **docman-domain**        | The `Document` entity (Mongo-mapped), `DocumentStatus`, `DocumentType` (the fixed classification category set), all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
 | **docman-persistence**    | `DocumentMetadataRepository` — the Spring Data MongoDB repository for `Document`               |
-| **docman-service**        | Service interfaces *and* implementations: `DocumentService`, `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (Ollama summarization) |
+| **docman-service**        | Service interfaces *and* implementations: `DocumentService`, `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (Ollama summarization), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
 | **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates workflows from the API layer |
 | **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST), exception handling, Kafka/MinIO/executor configuration |
 
@@ -102,6 +103,7 @@ sequenceDiagram
     participant MinIO
     participant Idx as DocumentIndexService
     participant Sum as DocumentSummaryService
+    participant Cls as DocumentClassificationService
     participant Mongo
     participant Kafka
 
@@ -121,10 +123,17 @@ sequenceDiagram
         WF->>Act: generateSummary(document)
         Act->>Sum: extract text, ask Ollama for a summary
     end
-    WF->>WF: merge status=INDEXED + summary into metadata
+    WF->>WF: status=INDEXED
+    WF->>Act: classifyDocument(document)
+    Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
+    WF->>WF: merge summary into metadata
     WF->>Act: update(merged document)
-    Act->>Mongo: save (single write)
+    Act->>Mongo: save
     Act->>Kafka: publish "Document Indexed"
+    WF->>WF: merge documentType (or "unknown" on failure)
+    WF->>Act: update(document)
+    Act->>Mongo: save
+    Act->>Kafka: publish "Document Classified: {documentType}"
 ```
 
 Key design points:
@@ -135,15 +144,51 @@ Key design points:
   moment of each poll does. The workflow gives up after 15 minutes (`MAX_UPLOAD_WAIT`) if content
   never arrives, and the document ends up `FAILED`.
 - **Indexing and summarization run concurrently** (`Async.function`), since both only need the
-  already-uploaded content. Their results are merged into a single `document` object and persisted
-  in **one** final write, avoiding a lost-update race between the two.
-- **A failed summary never fails the document.** Summary generation gets its own activity stub
-  with a 10-minute timeout and a single attempt (retrying a slow-but-correct LLM call wastes time
-  for no benefit); if it throws, the workflow logs it, emits a Kafka notification, and continues —
-  the document still reaches `INDEXED`. A failed *index* step, by contrast, still fails the whole
-  document (index/embed/search is the core capability; summarization is supplementary).
+  already-uploaded content. Classification, by contrast, is kicked off only once indexing
+  completes, since it queries the chunks indexing just wrote to the vector store rather than
+  re-reading raw content from MinIO — see [Document Classification](#document-classification).
+- **A failed summary or classification never fails the document.** Both get their own activity
+  stub with a 10-minute timeout and a single attempt (retrying a slow-but-correct LLM call wastes
+  time for no benefit); if either throws, the workflow logs it and continues (classification falls
+  back to `unknown`) — the document still reaches `INDEXED`. A failed *index* step, by contrast,
+  still fails the whole document (index/embed/search is the core capability; summarization and
+  classification are supplementary).
 - **Every step publishes a Kafka event** (`documents` topic) so external systems can observe
   ingestion progress without polling the API.
+
+## Document Classification
+
+Once indexing completes, `DocumentClassificationServiceImpl` assigns `documentType` by asking
+`llama3.1` to pick exactly one of a fixed set of categories (`DocumentType`, in `docman-domain`):
+`statements`, `invoices`, `policy documents`, `compliance certificates`, `insurance documents`,
+`contracts` — or `unknown` if the document doesn't clearly match any of them (also the fallback if
+the model's response doesn't match a known label, or if the activity throws).
+
+Rather than re-fetching the raw file from MinIO and re-running Tika (which indexing already did),
+classification reuses the chunks indexing just wrote to the OpenSearch vector store: it runs a
+`QuestionAnswerAdvisor`-based RAG query scoped to this document alone, via a `parent_document_id`
+filter expression (the same metadata key `DocumentIndexService.deleteIndex` uses to clean up a
+document's chunks). This means classification only becomes possible after indexing — there's
+nothing to retrieve before that.
+
+Classification runs at `temperature 0` via a per-call `OllamaChatOptions` override passed directly
+in code, so the same document consistently gets the same category — a single-word classification
+otherwise drifts between similar categories (e.g. "invoices" vs. "statements") on repeated runs of
+identical content at Ollama's non-zero default sampling temperature. (RAG answers and summaries
+don't set this override, so they run at whatever temperature Ollama itself defaults to — see the
+`spring.ai.ollama.chat.options.temperature` note in
+[`docs/SETUP.md`](SETUP.md#configuration-reference) for a config quirk affecting that value.)
+
+Once a category is decided, the workflow persists `documentType` on the `Document` record and
+publishes a `Document Classified: {documentType}` Kafka event — separate from the `Document
+Indexed` event, since classification finishes after indexing's own Mongo write.
+
+**Known limitation**: classification updates the Mongo `Document` record, but does *not* retroactively
+update the `documentType` already written into the vector store's chunk metadata (indexing runs
+*before* classification, so it can only capture whatever `documentType` the caller supplied at
+creation — usually nothing). This means `POST /document/search` filtering by `documentType` matches
+the caller-supplied value at upload time, not the AI-assigned one; `GET /document/metadata/{id}` is
+the source of truth for the classified type.
 
 ## Search & RAG
 
@@ -164,7 +209,9 @@ Two independent search paths exist over the same OpenSearch index (`docman-vecto
 
 Each indexed chunk's metadata includes the caller-supplied `metadata` map, plus two fields the
 system adds automatically: `parent_document_id` (used to collapse/dedupe multiple chunks from the
-same document in search results) and, when set, `documentType`.
+same document in search results) and, when set at creation time, `documentType` — see the [known
+limitation](#document-classification) above for why this is the caller-supplied value, not the
+later AI-classified one.
 
 ## Presigned URLs
 
