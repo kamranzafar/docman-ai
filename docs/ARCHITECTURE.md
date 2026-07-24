@@ -118,7 +118,7 @@ sequenceDiagram
     Act->>Mongo: save
     Act->>Kafka: publish "Content Uploaded"
     WF->>Act: index(document)
-    Act->>Idx: extract, chunk, embed, index, then force a refresh
+    Act->>Idx: extract, chunk, embed, index
     WF->>WF: status=INDEXED
     par concurrently
         WF->>Act: generateSummary(document)
@@ -147,8 +147,7 @@ Key design points:
 - **Summarization and classification both run only after indexing completes**, since both query
   the chunks indexing just wrote to the vector store rather than re-reading raw content from
   MinIO — see [Document Summarization & Classification](#document-summarization--classification).
-  They run concurrently with *each other*, but neither can start until indexing (and its
-  post-write refresh) has finished.
+  They run concurrently with *each other*, but neither can start until indexing has finished.
 - **A failed summary or classification never fails the document.** Both get their own activity
   stub with a 10-minute timeout and a single attempt (retrying a slow-but-correct LLM call wastes
   time for no benefit); if either throws, the workflow logs it and continues (classification falls
@@ -183,15 +182,19 @@ and re-running Tika a second time:
   "invoices" vs. "statements") on repeated runs of identical content at the app's configured
   temperature of `1`.
 
-**Both depend on indexing's post-write refresh.** OpenSearch's default near-real-time refresh means
-newly-added chunks aren't guaranteed searchable the instant `vectorStore.add()` returns — there can
-be up to a second (or more, under load) before a background refresh cycle makes them visible.
-Since both AI steps above query for this document's chunks immediately after indexing completes,
-`DocumentIndexServiceImpl.index()` explicitly calls `openSearchClient.indices().refresh(...)`
-itself right after adding the chunks, so by the time indexing's activity returns (and the workflow
-kicks off summarization/classification), those chunks are guaranteed queryable — closing what would
-otherwise be an intermittent race (summary/classification silently seeing zero chunks depending on
-system timing).
+**Both retry briefly instead of forcing a refresh.** OpenSearch's default near-real-time refresh
+means newly-added chunks aren't guaranteed searchable the instant `vectorStore.add()` returns —
+there can be up to a second (or more, under load) before a background refresh cycle makes them
+visible. Indexing deliberately does *not* force a synchronous refresh after adding chunks: at the
+ingestion rates this app is meant to handle (tens of documents/second), that would turn every single
+document into its own Lucene segment flush instead of letting writes batch into the normal refresh
+cycle — trading a small, bounded per-document wait for a much larger, sustained indexing-throughput
+cost. Instead, `VectorStoreConsistency.awaitChunks()` (`docman-service`) wraps the query both AI
+steps make with a short bounded retry (up to 5 attempts, 300ms apart — so at most ~1.2s), which
+comfortably covers the default refresh interval. Classification does a cheap `topK(1)` existence
+check with this retry before running its (expensive) LLM call, so a document with genuinely no
+extractable text short-circuits straight to `unknown` instead of asking the model to classify
+nothing; summarization's own retrieval reuses the same helper directly.
 
 Once a category is decided, the workflow persists `documentType` on the `Document` record and
 publishes a `Document Classified: {documentType}` Kafka event — separate from the `Document
@@ -213,8 +216,10 @@ calls `DocumentIndexService.updateMetadata()`, which runs an OpenSearch `update_
 this document's chunks (the same `parent_document_id` filter used elsewhere) with a small Painless
 script that merges each key from the current Mongo `metadata`/`documentType` into the chunk's
 existing `metadata` object — key-by-key, not a wholesale replace, so chunk-only fields
-(`parent_document_id`, `chunk_index`, `total_chunks`) survive untouched. The request sets
-`refresh: true` directly, so the change is searchable immediately, without a separate refresh call.
+(`parent_document_id`, `chunk_index`, `total_chunks`) survive untouched. Like indexing, this
+deliberately does not force a refresh — this runs off a Kafka consumer with nothing synchronously
+waiting on it, so there's no reason to pay for an immediate segment flush per update at whatever
+rate they arrive; it becomes visible on the next natural refresh cycle instead.
 
 This is deliberately a metadata-only patch, not a reindex: it never touches `embedding` or
 `content`, so it doesn't re-run Tika, MinIO, or the embedding model. A few consequences worth

@@ -65,7 +65,7 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();
 
-        List<org.springframework.ai.document.Document> chunks = vectorStore.similaritySearch(
+        List<org.springframework.ai.document.Document> chunks = VectorStoreConsistency.awaitChunks(vectorStore,
                 SearchRequest.builder()
                         .query(document.getName())
                         .filterExpression(documentFilter)
