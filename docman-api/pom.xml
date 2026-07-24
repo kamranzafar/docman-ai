@@ -152,7 +152,6 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <addResources>true</addResources>
-                    <jvmArguments>-Djavax.net.ssl.trustStore=${env.SSL_KEYSTORE} -Djavax.net.ssl.trustStorePassword=${env.SSL_KEYSTORE_PASS}</jvmArguments>
                 </configuration>
             </plugin>
         </plugins>

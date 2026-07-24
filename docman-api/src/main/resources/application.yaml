@@ -1,5 +1,5 @@
 server:
-  port: 8088
+  port: 8081
 minio:
   address: http://localhost:9000
   user: minioadmin
@@ -34,6 +34,12 @@ spring:
     workers-auto-discovery:
       packages:
         - "org.kamranzafar.docman.wf"
+  ssl:
+    bundle:
+      pem:
+        opensearch:
+          truststore:
+            certificate: classpath:opensearch-root-ca.pem
   ai:
     vectorstore:
       opensearch:
@@ -44,6 +50,7 @@ spring:
         index-name: docman-vector-index
         dimensions: 768
         similarity: cosinesimil
+        ssl-bundle: opensearch
     ollama:
       base-url: http://localhost:11434/
       embedding:
