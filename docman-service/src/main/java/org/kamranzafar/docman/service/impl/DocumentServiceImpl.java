@@ -19,6 +19,7 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.kamranzafar.docman.exception.DocumentConflictException;
 import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
@@ -32,6 +33,11 @@ import org.kamranzafar.docman.repository.DocumentRevisionRepository;
 import org.kamranzafar.docman.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +63,8 @@ public class DocumentServiceImpl implements DocumentService {
     private DocumentMapper documentMapper;
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     @Transactional
     @Override
@@ -104,32 +112,45 @@ public class DocumentServiceImpl implements DocumentService {
                                        String newFileContentType) {
         log.info("Updating document {} (user-driven, version bump)", id);
 
-        Optional<Document> op = documentMetadataRepository.findById(id);
-        if (op.isEmpty()) {
-            throw new DocumentNotFoundException("Document not found");
-        }
+        Document current = documentMetadataRepository.findById(id)
+                .orElseThrow(() -> new DocumentNotFoundException("Document not found"));
 
-        Document document = op.get();
         boolean fileIncluded = StringUtils.hasText(newFileName);
+        int expectedVersion = current.getVersion();
 
-        document.setVersion(document.getVersion() + 1);
-        document.setMetadata(request.getMetadata() != null ? new HashMap<>(request.getMetadata()) : new HashMap<>());
-        if (StringUtils.hasText(request.getDocumentType())) {
-            document.setDocumentType(request.getDocumentType());
-        }
-        document.setUpdatedAt(Instant.now());
-        if (StringUtils.hasText(request.getUpdatedBy())) {
-            document.setUpdatedBy(request.getUpdatedBy());
-        }
+        Map<String, Object> metadata = request.getMetadata() != null
+                ? new HashMap<>(request.getMetadata()) : new HashMap<>();
+        String documentType = StringUtils.hasText(request.getDocumentType())
+                ? request.getDocumentType() : current.getDocumentType();
+        String updatedBy = StringUtils.hasText(request.getUpdatedBy())
+                ? request.getUpdatedBy() : current.getUpdatedBy();
 
+        Update update = new Update()
+                .set("version", expectedVersion + 1)
+                .set("metadata", metadata)
+                .set("documentType", documentType)
+                .set("updatedAt", Instant.now())
+                .set("updatedBy", updatedBy);
         if (fileIncluded) {
-            document.setName(newFileName);
-            document.setContentType(newFileContentType);
-            // A new file re-enters the same ingestion pipeline as a brand new document.
-            document.setStatus(DocumentStatus.CREATED.name());
+            update.set("name", newFileName)
+                    .set("contentType", newFileContentType)
+                    // A new file re-enters the same ingestion pipeline as a brand new document.
+                    .set("status", DocumentStatus.CREATED.name());
         }
 
-        documentMetadataRepository.save(document);
+        // Optimistic concurrency guard: the update only applies if `version` still
+        // matches what we just read. If a concurrent update already bumped it (e.g. two
+        // requests updating the same document at once), this matches zero documents and
+        // we fail fast instead of one silently overwriting/losing the other's change.
+        Query query = Query.query(Criteria.where("_id").is(id).and("version").is(expectedVersion));
+        Document document = mongoTemplate.findAndModify(
+                query, update, FindAndModifyOptions.options().returnNew(true), Document.class);
+
+        if (document == null) {
+            throw new DocumentConflictException(
+                    "Document " + id + " was concurrently modified by another request - reload and retry");
+        }
+
         saveRevision(document, fileIncluded);
 
         // Skip the metadata-sync trigger when a file is included: the caller is about to

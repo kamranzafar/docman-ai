@@ -211,6 +211,20 @@ Updates come in the same two flavors as creation does, mirroring `POST`/`PUT /do
   new object key upfront, this endpoint always requires `name`/`contentType` in the request body —
   unlike `PUT /document/{id}`, it has no metadata-only mode.
 
+**Concurrency guard**: `updateDocument` uses an optimistic-concurrency compare-and-swap rather
+than a plain read-modify-write. It reads the current `Document`, then applies the change via
+`MongoTemplate.findAndModify` with a query matching both `_id` *and* `version` equal to what was
+just read, atomically setting the new fields (including `version + 1`) only if that match still
+holds. If another request already won the race and bumped the version in between, the conditional
+update matches nothing, `findAndModify` returns `null`, and the loser gets a
+`DocumentConflictException` (`409 Conflict`) instead of silently overwriting or losing the winner's
+change — verified under load by firing a burst of concurrent updates at the same document: exactly
+one succeeds per contended version, the rest cleanly 409, and the revision history has no
+duplicate or corrupted entries. This is deliberately different from the version field itself, which
+is a plain int (not Spring Data's `@Version` optimistic-locking annotation, since that would bump
+on every save including internal system ones) — the concurrency check here is a manual condition
+on the same field, applied only in this one code path.
+
 MinIO objects are stored per version — `{documentId}/{version}/{name}` — so every version's file
 remains independently retrievable; `ObjectStoreServiceImpl` builds this key from
 `DocumentDto.getVersion()` for every operation. A full `DELETE /document/{id}` removes every
