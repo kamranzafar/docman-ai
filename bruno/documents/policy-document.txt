@@ -1,0 +1,39 @@
+ACME CORPORATION
+REMOTE WORK POLICY
+
+Policy Number: HR-POL-014
+Effective Date: 2026-01-01
+Last Reviewed: 2026-05-15
+Owner: Human Resources Department
+
+1. PURPOSE
+This policy establishes guidelines for employees who work remotely on a full-time or
+hybrid basis, ensuring consistent expectations around availability, security, and
+performance across the organization.
+
+2. SCOPE
+This policy applies to all full-time and part-time employees approved for remote work
+arrangements by their department manager and Human Resources.
+
+3. ELIGIBILITY
+Employees must have completed their introductory 90-day period and maintain a
+satisfactory performance record to be eligible for remote work arrangements.
+
+4. EQUIPMENT AND SECURITY
+- Employees must use company-issued laptops with up-to-date endpoint protection software.
+- All company data must be accessed through the corporate VPN.
+- Employees must lock their workstation when unattended.
+
+5. WORKING HOURS AND AVAILABILITY
+Remote employees are expected to be available during core business hours
+(10:00 AM - 3:00 PM local time) and to respond to messages within one business day.
+
+6. PERFORMANCE MANAGEMENT
+Remote work arrangements are subject to ongoing review and may be revoked at the
+discretion of management if performance or availability standards are not met.
+
+7. POLICY REVIEW
+This policy will be reviewed annually by Human Resources and may be updated to reflect
+changes in business needs or applicable regulations.
+
+Approved by: VP of Human Resources

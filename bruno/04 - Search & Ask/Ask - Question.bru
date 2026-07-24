@@ -1,0 +1,40 @@
+meta {
+  name: Ask - Question
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/ask
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "question": "What is the total amount due on the invoice from Widget Supplies Inc.?"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns an LLM-generated answer grounded in indexed documents", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.answer).to.be.a("string").and.not.empty;
+  });
+}
+
+docs {
+  RAG: `QuestionAnswerAdvisor` pulls relevant chunks from the vector store (Ollama
+  embeddings) and `llama3.1` composes the answer. Confirmed during development to
+  correctly answer "$518.40" against the sample `documents/invoice.txt` content - phrase
+  your own question to match whatever sample documents you've actually ingested.
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Get Content - Latest
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/document/content/{{documentId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns a presigned download url for the current version", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.url).to.include("X-Amz-Signature");
+  });
+}
+
+docs {
+  GET the returned `url` directly (outside this collection) to download the actual bytes -
+  it's a presigned MinIO GET URL, not a `{{baseUrl}}` one.
+}

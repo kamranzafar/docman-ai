@@ -1,0 +1,505 @@
+2026-07-24 16:39:10,168 INFO Version [background-preinit] HV000001: Hibernate Validator 8.0.3.Final
+2026-07-24 16:39:10,316 INFO StartupInfoLogger [main] Starting Application v1.0-SNAPSHOT using Java 25.0.2 with PID 7205 (/Users/kamran/workspace/idea/docman-ai/docman-api/target/docman-api-1.0-SNAPSHOT.jar started by kamran in /Users/kamran/workspace/idea/docman-ai)
+2026-07-24 16:39:10,325 DEBUG StartupInfoLogger [main] Running with Spring Boot v3.5.13, Spring v6.2.17
+2026-07-24 16:39:10,327 INFO SpringApplication [main] No active profile set, falling back to 1 default profile: "default"
+2026-07-24 16:39:11,588 INFO RepositoryConfigurationDelegate [main] Bootstrapping Spring Data MongoDB repositories in DEFAULT mode.
+2026-07-24 16:39:11,757 INFO RepositoryConfigurationDelegate [main] Finished Spring Data repository scanning in 161 ms. Found 2 MongoDB repository interfaces.
+2026-07-24 16:39:13,289 INFO TomcatWebServer [main] Tomcat initialized with port 8081 (http)
+2026-07-24 16:39:13,312 INFO DirectJDKLog [main] Initializing ProtocolHandler ["http-nio-8081"]
+2026-07-24 16:39:13,317 INFO DirectJDKLog [main] Starting service [Tomcat]
+2026-07-24 16:39:13,319 INFO DirectJDKLog [main] Starting Servlet engine: [Apache Tomcat/10.1.53]
+2026-07-24 16:39:13,410 INFO DirectJDKLog [main] Initializing Spring embedded WebApplicationContext
+2026-07-24 16:39:13,412 INFO ServletWebServerApplicationContext [main] Root WebApplicationContext: initialization completed in 2986 ms
+2026-07-24 16:39:13,981 INFO SLF4JLogger [main] MongoClient with metadata {"driver": {"name": "mongo-java-driver|sync|spring-boot", "version": "5.5.2"}, "os": {"type": "Darwin", "name": "Mac OS X", "architecture": "x86_64", "version": "15.7.7"}, "platform": "Java/Oracle Corporation/25.0.2+10-LTS-69"} created with settings MongoClientSettings{readPreference=primary, writeConcern=WriteConcern{w=null, wTimeout=null ms, journal=null}, retryWrites=true, retryReads=true, readConcern=ReadConcern{level=null}, credential=null, transportSettings=null, commandListeners=[io.micrometer.core.instrument.binder.mongodb.MongoMetricsCommandListener@58ec8271], codecRegistry=ProvidersCodecRegistry{codecProviders=[ValueCodecProvider{}, BsonValueCodecProvider{}, DBRefCodecProvider{}, DBObjectCodecProvider{}, DocumentCodecProvider{}, CollectionCodecProvider{}, IterableCodecProvider{}, MapCodecProvider{}, GeoJsonCodecProvider{}, GridFSFileCodecProvider{}, Jsr310CodecProvider{}, JsonObjectCodecProvider{}, BsonCodecProvider{}, EnumCodecProvider{}, com.mongodb.client.model.mql.ExpressionCodecProvider@a44effb, com.mongodb.Jep395RecordCodecProvider@3ee258, com.mongodb.KotlinCodecProvider@4f676900]}, loggerSettings=LoggerSettings{maxDocumentLength=1000}, clusterSettings={hosts=[localhost:27017], srvServiceName=mongodb, mode=SINGLE, requiredClusterType=UNKNOWN, requiredReplicaSetName='null', serverSelector='null', clusterListeners='[]', serverSelectionTimeout='30000 ms', localThreshold='15 ms'}, socketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=0, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, heartbeatSocketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=10000, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, connectionPoolSettings=ConnectionPoolSettings{maxSize=100, minSize=0, maxWaitTimeMS=120000, maxConnectionLifeTimeMS=0, maxConnectionIdleTimeMS=0, maintenanceInitialDelayMS=0, maintenanceFrequencyMS=60000, connectionPoolListeners=[io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener@73a49597], maxConnecting=2}, serverSettings=ServerSettings{heartbeatFrequencyMS=10000, minHeartbeatFrequencyMS=500, serverMonitoringMode=AUTO, serverListeners='[]', serverMonitorListeners='[]'}, sslSettings=SslSettings{enabled=false, invalidHostNameAllowed=false, context=null}, applicationName='null', compressorList=[], uuidRepresentation=JAVA_LEGACY, serverApi=null, autoEncryptionSettings=null, dnsClient=null, inetAddressResolver=null, contextProvider=null, timeoutMS=null}
+2026-07-24 16:39:14,020 INFO SLF4JLogger [cluster-ClusterId{value='6a630891e76b53c72279120e', description='null'}-localhost:27017] Monitor thread successfully connected to server with description ServerDescription{address=localhost:27017, type=STANDALONE, cryptd=false, state=CONNECTED, ok=true, minWireVersion=0, maxWireVersion=27, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=30, roundTripTimeNanos=26486589, minRoundTripTimeNanos=0}
+2026-07-24 16:39:16,998 INFO WorkflowServiceStubsImpl [main] Created WorkflowServiceStubs for channel: ManagedChannelOrphanWrapper{delegate=ManagedChannelImpl{logId=1, target=localhost:7233}}
+2026-07-24 16:39:17,543 INFO WorkersTemplate [main] Creating a worker with default settings for a task queue 'documents' caused by an auto-discovered workflow class class org.kamranzafar.docman.wf.impl.DocumentWorkflowImpl
+2026-07-24 16:39:17,605 INFO WorkersTemplate [main] Registering auto-discovered workflow class class org.kamranzafar.docman.wf.impl.DocumentWorkflowImpl on a worker  with a task queue 'documents'
+2026-07-24 16:39:17,610 INFO WorkersTemplate [main] Registering auto-discovered activity bean 'documentActivitiesImpl' of class class org.kamranzafar.docman.wf.impl.DocumentActivitiesImpl on a worker  with a task queue 'documents'
+2026-07-24 16:39:17,922 INFO EndpointLinksResolver [main] Exposing 1 endpoint beneath base path '/actuator'
+2026-07-24 16:39:17,988 INFO AbstractConfig [main] AdminClientConfig values: 
+	auto.include.jmx.reporter = true
+	bootstrap.controllers = []
+	bootstrap.servers = [localhost:9092]
+	client.dns.lookup = use_all_dns_ips
+	client.id = 
+	connections.max.idle.ms = 300000
+	default.api.timeout.ms = 60000
+	enable.metrics.push = true
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+
+2026-07-24 16:39:18,223 INFO AppInfoParser$AppInfo [main] Kafka version: 3.9.2
+2026-07-24 16:39:18,223 INFO AppInfoParser$AppInfo [main] Kafka commitId: 5e9866f43ab8e7e4
+2026-07-24 16:39:18,223 INFO AppInfoParser$AppInfo [main] Kafka startTimeMs: 1784875158220
+2026-07-24 16:39:18,860 INFO AppInfoParser [kafka-admin-client-thread | adminclient-1] App info kafka.admin.client for adminclient-1 unregistered
+2026-07-24 16:39:18,867 INFO Metrics [kafka-admin-client-thread | adminclient-1] Metrics scheduler closed
+2026-07-24 16:39:18,867 INFO Metrics [kafka-admin-client-thread | adminclient-1] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-07-24 16:39:18,867 INFO Metrics [kafka-admin-client-thread | adminclient-1] Metrics reporters closed
+2026-07-24 16:39:18,988 INFO DirectJDKLog [main] Starting ProtocolHandler ["http-nio-8081"]
+2026-07-24 16:39:19,004 INFO TomcatWebServer [main] Tomcat started on port 8081 (http) with context path '/'
+2026-07-24 16:39:19,051 INFO AbstractConfig [main] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-docman-index-sync-1
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = docman-index-sync
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-07-24 16:39:19,118 INFO KafkaMetricsCollector$StateLedger [main] initializing Kafka metrics collector
+2026-07-24 16:39:19,192 INFO AppInfoParser$AppInfo [main] Kafka version: 3.9.2
+2026-07-24 16:39:19,192 INFO AppInfoParser$AppInfo [main] Kafka commitId: 5e9866f43ab8e7e4
+2026-07-24 16:39:19,192 INFO AppInfoParser$AppInfo [main] Kafka startTimeMs: 1784875159192
+2026-07-24 16:39:19,196 INFO ClassicKafkaConsumer [main] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Subscribed to topic(s): document-metadata-sync
+2026-07-24 16:39:19,211 INFO AbstractConfig [main] ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-docman-2
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = docman
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-07-24 16:39:19,213 INFO KafkaMetricsCollector$StateLedger [main] initializing Kafka metrics collector
+2026-07-24 16:39:19,228 INFO AppInfoParser$AppInfo [main] Kafka version: 3.9.2
+2026-07-24 16:39:19,228 INFO AppInfoParser$AppInfo [main] Kafka commitId: 5e9866f43ab8e7e4
+2026-07-24 16:39:19,228 INFO AppInfoParser$AppInfo [main] Kafka startTimeMs: 1784875159228
+2026-07-24 16:39:19,229 INFO ClassicKafkaConsumer [main] [Consumer clientId=consumer-docman-2, groupId=docman] Subscribed to topic(s): documents
+2026-07-24 16:39:19,240 INFO Metadata [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Cluster ID: iRHWtinYTp-GJSJ9DSBnyA
+2026-07-24 16:39:19,246 INFO Metadata [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Cluster ID: iRHWtinYTp-GJSJ9DSBnyA
+2026-07-24 16:39:19,257 INFO StartupInfoLogger [main] Started Application in 9.908 seconds (process running for 11.389)
+2026-07-24 16:39:19,879 INFO MultiThreadedPoller [main] start: MultiThreadedPoller{name=Workflow Poller taskQueue="documents", namespace="default", identity=7205@Kamrans-MacBook-Pro.local}
+2026-07-24 16:39:19,891 INFO MultiThreadedPoller [main] start: MultiThreadedPoller{name=Activity Poller taskQueue="documents", namespace="default", identity=7205@Kamrans-MacBook-Pro.local}
+2026-07-24 16:39:21,004 INFO AbstractCoordinator$FindCoordinatorResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-07-24 16:39:21,007 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] (Re-)joining group
+2026-07-24 16:39:21,062 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Request joining group due to: need to re-join with the given member-id: consumer-docman-index-sync-1-bbedc176-7679-4ab0-81e0-eec02a9daada
+2026-07-24 16:39:21,063 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] (Re-)joining group
+2026-07-24 16:39:21,100 INFO AbstractCoordinator$FindCoordinatorResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-07-24 16:39:21,101 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] (Re-)joining group
+2026-07-24 16:39:21,112 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Request joining group due to: need to re-join with the given member-id: consumer-docman-2-3ed3075b-5d25-4c32-b1e6-0c5cc5cbf38c
+2026-07-24 16:39:21,112 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] (Re-)joining group
+2026-07-24 16:39:24,100 INFO AbstractCoordinator$JoinGroupResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Successfully joined group with generation Generation{generationId=1, memberId='consumer-docman-index-sync-1-bbedc176-7679-4ab0-81e0-eec02a9daada', protocol='range'}
+2026-07-24 16:39:24,109 INFO ConsumerCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Finished assignment for group at generation 1: {consumer-docman-index-sync-1-bbedc176-7679-4ab0-81e0-eec02a9daada=Assignment(partitions=[document-metadata-sync-0])}
+2026-07-24 16:39:24,121 INFO AbstractCoordinator$JoinGroupResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Successfully joined group with generation Generation{generationId=1, memberId='consumer-docman-2-3ed3075b-5d25-4c32-b1e6-0c5cc5cbf38c', protocol='range'}
+2026-07-24 16:39:24,122 INFO ConsumerCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Finished assignment for group at generation 1: {consumer-docman-2-3ed3075b-5d25-4c32-b1e6-0c5cc5cbf38c=Assignment(partitions=[documents-0])}
+2026-07-24 16:39:24,270 INFO AbstractCoordinator$SyncGroupResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Successfully synced group in generation Generation{generationId=1, memberId='consumer-docman-2-3ed3075b-5d25-4c32-b1e6-0c5cc5cbf38c', protocol='range'}
+2026-07-24 16:39:24,270 INFO AbstractCoordinator$SyncGroupResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Successfully synced group in generation Generation{generationId=1, memberId='consumer-docman-index-sync-1-bbedc176-7679-4ab0-81e0-eec02a9daada', protocol='range'}
+2026-07-24 16:39:24,270 INFO ConsumerCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Notifying assignor about the new Assignment(partitions=[document-metadata-sync-0])
+2026-07-24 16:39:24,270 INFO ConsumerCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Notifying assignor about the new Assignment(partitions=[documents-0])
+2026-07-24 16:39:24,275 INFO ConsumerRebalanceListenerInvoker [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Adding newly assigned partitions: document-metadata-sync-0
+2026-07-24 16:39:24,275 INFO ConsumerRebalanceListenerInvoker [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Adding newly assigned partitions: documents-0
+2026-07-24 16:39:24,295 INFO ConsumerCoordinator$OffsetFetchResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Found no committed offset for partition document-metadata-sync-0
+2026-07-24 16:39:24,295 INFO ConsumerCoordinator$OffsetFetchResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Found no committed offset for partition documents-0
+2026-07-24 16:39:24,302 INFO ConsumerCoordinator$OffsetFetchResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Found no committed offset for partition documents-0
+2026-07-24 16:39:24,302 INFO ConsumerCoordinator$OffsetFetchResponseHandler [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Found no committed offset for partition document-metadata-sync-0
+2026-07-24 16:39:24,332 INFO SubscriptionState [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Resetting offset for partition document-metadata-sync-0 to position FetchPosition{offset=0, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=0}}.
+2026-07-24 16:39:24,332 INFO SubscriptionState [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Resetting offset for partition documents-0 to position FetchPosition{offset=0, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=0}}.
+2026-07-24 16:39:24,365 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] docman-index-sync: partitions assigned: [document-metadata-sync-0]
+2026-07-24 16:39:24,365 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] docman: partitions assigned: [documents-0]
+2026-07-24 16:39:58,274 INFO DirectJDKLog [http-nio-8081-exec-2] Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-07-24 16:39:58,277 INFO FrameworkServlet [http-nio-8081-exec-2] Initializing Servlet 'dispatcherServlet'
+2026-07-24 16:39:58,289 INFO FrameworkServlet [http-nio-8081-exec-2] Completed initialization in 11 ms
+2026-07-24 16:39:59,012 INFO DocumentServiceImpl [http-nio-8081-exec-2] Creating a new document with id 295536ab-ceea-4e9c-8f24-c6c43fb6be2a
+2026-07-24 16:39:59,013 DEBUG DocumentServiceImpl [http-nio-8081-exec-2] Saving document with id 295536ab-ceea-4e9c-8f24-c6c43fb6be2a
+2026-07-24 16:40:00,457 INFO AbstractConfig [Activity Executor taskQueue="documents", namespace="default": 1] ProducerConfig values: 
+	acks = -1
+	auto.include.jmx.reporter = true
+	batch.size = 16384
+	bootstrap.servers = [localhost:9092]
+	buffer.memory = 33554432
+	client.dns.lookup = use_all_dns_ips
+	client.id = producer-1
+	compression.gzip.level = -1
+	compression.lz4.level = 9
+	compression.type = none
+	compression.zstd.level = 3
+	connections.max.idle.ms = 540000
+	delivery.timeout.ms = 120000
+	enable.idempotence = true
+	enable.metrics.push = true
+	interceptor.classes = []
+	key.serializer = class org.apache.kafka.common.serialization.StringSerializer
+	linger.ms = 0
+	max.block.ms = 60000
+	max.in.flight.requests.per.connection = 5
+	max.request.size = 1048576
+	metadata.max.age.ms = 300000
+	metadata.max.idle.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partitioner.adaptive.partitioning.enable = true
+	partitioner.availability.timeout.ms = 0
+	partitioner.class = null
+	partitioner.ignore.keys = false
+	receive.buffer.bytes = 32768
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	transaction.timeout.ms = 60000
+	transactional.id = null
+	value.serializer = class org.apache.kafka.common.serialization.StringSerializer
+
+2026-07-24 16:40:00,462 INFO KafkaMetricsCollector$StateLedger [Activity Executor taskQueue="documents", namespace="default": 1] initializing Kafka metrics collector
+2026-07-24 16:40:00,487 INFO KafkaProducer [Activity Executor taskQueue="documents", namespace="default": 1] [Producer clientId=producer-1] Instantiated an idempotent producer.
+2026-07-24 16:40:00,510 INFO AppInfoParser$AppInfo [Activity Executor taskQueue="documents", namespace="default": 1] Kafka version: 3.9.2
+2026-07-24 16:40:00,511 INFO AppInfoParser$AppInfo [Activity Executor taskQueue="documents", namespace="default": 1] Kafka commitId: 5e9866f43ab8e7e4
+2026-07-24 16:40:00,511 INFO AppInfoParser$AppInfo [Activity Executor taskQueue="documents", namespace="default": 1] Kafka startTimeMs: 1784875200510
+2026-07-24 16:40:00,526 INFO Metadata [kafka-producer-network-thread | producer-1] [Producer clientId=producer-1] Cluster ID: iRHWtinYTp-GJSJ9DSBnyA
+2026-07-24 16:40:00,604 INFO TransactionManager [kafka-producer-network-thread | producer-1] [Producer clientId=producer-1] ProducerId set to 0 with epoch 0
+2026-07-24 16:40:00,711 INFO KafkaConsumer [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] Received Message in group docman: Document 295536ab-ceea-4e9c-8f24-c6c43fb6be2a: Document Created
+2026-07-24 16:40:24,209 INFO ConsumerRebalanceListenerInvoker [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Revoke previously assigned partitions documents-0
+2026-07-24 16:40:24,209 INFO ConsumerRebalanceListenerInvoker [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Revoke previously assigned partitions document-metadata-sync-0
+2026-07-24 16:40:24,209 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] docman: partitions revoked: [documents-0]
+2026-07-24 16:40:24,209 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] docman-index-sync: partitions revoked: [document-metadata-sync-0]
+2026-07-24 16:40:24,211 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Member consumer-docman-2-3ed3075b-5d25-4c32-b1e6-0c5cc5cbf38c sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-07-24 16:40:24,211 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Member consumer-docman-index-sync-1-bbedc176-7679-4ab0-81e0-eec02a9daada sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-07-24 16:40:24,212 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,212 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,213 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Request joining group due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,213 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Request joining group due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,213 INFO ClassicKafkaConsumer [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Unsubscribed all topics or patterns and assigned partitions
+2026-07-24 16:40:24,213 INFO ClassicKafkaConsumer [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Unsubscribed all topics or patterns and assigned partitions
+2026-07-24 16:40:24,217 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,217 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,217 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] [Consumer clientId=consumer-docman-2, groupId=docman] Request joining group due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,217 INFO AbstractCoordinator [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] [Consumer clientId=consumer-docman-index-sync-1, groupId=docman-index-sync] Request joining group due to: consumer pro-actively leaving the group
+2026-07-24 16:40:24,376 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] Metrics scheduler closed
+2026-07-24 16:40:24,377 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-07-24 16:40:24,377 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-07-24 16:40:24,377 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] Metrics reporters closed
+2026-07-24 16:40:24,384 INFO AppInfoParser [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] App info kafka.consumer for consumer-docman-2 unregistered
+2026-07-24 16:40:24,385 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#1-0-C-1] docman: Consumer stopped
+2026-07-24 16:40:24,586 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] Metrics scheduler closed
+2026-07-24 16:40:24,587 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-07-24 16:40:24,587 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-07-24 16:40:24,587 INFO Metrics [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] Metrics reporters closed
+2026-07-24 16:40:24,591 INFO AppInfoParser [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] App info kafka.consumer for consumer-docman-index-sync-1 unregistered
+2026-07-24 16:40:24,592 INFO LogAccessor [org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1] docman-index-sync: Consumer stopped
+2026-07-24 16:40:24,594 INFO GracefulShutdown [SpringApplicationShutdownHook] Commencing graceful shutdown. Waiting for active requests to complete
+2026-07-24 16:40:26,607 INFO GracefulShutdown [tomcat-shutdown] Graceful shutdown complete
+2026-07-24 16:40:26,611 INFO KafkaProducer [SpringApplicationShutdownHook] [Producer clientId=producer-1] Closing the Kafka producer with timeoutMillis = 30000 ms.
+2026-07-24 16:40:26,615 INFO Metrics [SpringApplicationShutdownHook] Metrics scheduler closed
+2026-07-24 16:40:26,615 INFO Metrics [SpringApplicationShutdownHook] Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-07-24 16:40:26,616 INFO Metrics [SpringApplicationShutdownHook] Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-07-24 16:40:26,616 INFO Metrics [SpringApplicationShutdownHook] Metrics reporters closed
+2026-07-24 16:40:26,617 INFO AppInfoParser [SpringApplicationShutdownHook] App info kafka.producer for producer-1 unregistered
+2026-07-24 16:40:26,625 INFO WorkerFactory [SpringApplicationShutdownHook] shutdown: WorkerFactory{identity=7205@Kamrans-MacBook-Pro.local}
+2026-07-24 16:40:26,629 INFO BasePoller [SpringApplicationShutdownHook] shutdown: MultiThreadedPoller{name=Workflow Poller taskQueue="documents", namespace="default", identity=7205@Kamrans-MacBook-Pro.local}
+2026-07-24 16:40:26,635 INFO MultiThreadedPoller$PollLoopTask [Workflow Poller taskQueue="documents", namespace="default": 1] poll loop is terminated: WorkflowPollTask
+2026-07-24 16:40:26,635 INFO MultiThreadedPoller$PollLoopTask [Workflow Poller taskQueue="documents", namespace="default": 3] poll loop is terminated: WorkflowPollTask
+2026-07-24 16:40:26,635 INFO MultiThreadedPoller$PollLoopTask [Workflow Poller taskQueue="documents", namespace="default": 5] poll loop is terminated: WorkflowPollTask
+2026-07-24 16:40:26,635 INFO MultiThreadedPoller$PollLoopTask [Workflow Poller taskQueue="documents", namespace="default": 4] poll loop is terminated: WorkflowPollTask
+2026-07-24 16:40:26,635 INFO MultiThreadedPoller$PollLoopTask [Workflow Poller taskQueue="documents", namespace="default": 2] poll loop is terminated: WorkflowPollTask
+2026-07-24 16:40:26,639 INFO BasePoller [SpringApplicationShutdownHook] shutdown: MultiThreadedPoller{name=Activity Poller taskQueue="documents", namespace="default", identity=7205@Kamrans-MacBook-Pro.local}
+2026-07-24 16:40:26,641 INFO MultiThreadedPoller$PollLoopTask [Activity Poller taskQueue="documents", namespace="default": 1] poll loop is terminated: ActivityPollTask
+2026-07-24 16:40:26,641 INFO MultiThreadedPoller$PollLoopTask [Activity Poller taskQueue="documents", namespace="default": 5] poll loop is terminated: ActivityPollTask
+2026-07-24 16:40:26,641 INFO MultiThreadedPoller$PollLoopTask [Activity Poller taskQueue="documents", namespace="default": 3] poll loop is terminated: ActivityPollTask
+2026-07-24 16:40:26,641 INFO MultiThreadedPoller$PollLoopTask [Activity Poller taskQueue="documents", namespace="default": 2] poll loop is terminated: ActivityPollTask
+2026-07-24 16:40:26,641 INFO MultiThreadedPoller$PollLoopTask [Activity Poller taskQueue="documents", namespace="default": 4] poll loop is terminated: ActivityPollTask
+2026-07-24 16:40:26,646 INFO WorkflowServiceStubsImpl [SpringApplicationShutdownHook] shutdown

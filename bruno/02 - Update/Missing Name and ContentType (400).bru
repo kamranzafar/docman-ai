@@ -1,0 +1,40 @@
+meta {
+  name: Missing Name and ContentType (400)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "metadata": { "foo": "bar" }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("requires name and contentType for a presigned update", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.body.detail).to.equal("name and contentType are mandatory for a presigned update");
+  });
+}
+
+docs {
+  Unlike the multipart update, the presigned update path has no file part to derive
+  `name`/`contentType` from, so both are required directly on the JSON body - this check
+  happens explicitly in the controller (not bean validation, since `DocumentUpdateRequest`
+  fields are optional for the metadata-only case).
+}

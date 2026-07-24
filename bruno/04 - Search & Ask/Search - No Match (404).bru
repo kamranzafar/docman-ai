@@ -1,0 +1,40 @@
+meta {
+  name: Search - No Match (404)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filters": {
+      "vendor": "nonexistent-vendor-zzz"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 404 when the filters match nothing", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.body.detail).to.equal("No matching document(s) found");
+  });
+}
+
+docs {
+  `lexicalSearch` throws `DocumentNotFoundException` (-> 404) on zero hits, unlike a
+  typical search API that would return an empty array with 200.
+}

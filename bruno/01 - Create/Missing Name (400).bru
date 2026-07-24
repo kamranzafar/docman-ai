@@ -1,0 +1,41 @@
+meta {
+  name: Missing Name (400)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "contentType": "application/pdf",
+    "metadata": { "vendor": "acme" }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 400 for missing name", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.body.detail).to.equal("Invalid request content.");
+  });
+}
+
+docs {
+  `name` is `@NotBlank` on `DocumentRequest` - omitting it fails bean validation before any
+  document is created. Spring's default `MethodArgumentNotValidException` handling doesn't
+  surface the specific field in `detail` (just "Invalid request content."); check server
+  logs for the field-level message if you need to confirm which constraint tripped.
+}

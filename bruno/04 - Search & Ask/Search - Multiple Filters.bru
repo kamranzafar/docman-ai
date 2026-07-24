@@ -1,0 +1,41 @@
+meta {
+  name: Search - Multiple Filters
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filters": {
+      "documentType": "invoices",
+      "vendor": "acme"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("combines filters with AND semantics", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Each entry in `filters` maps to a `metadata.<key>` term; multiple entries narrow the
+  result set. `vendor` here matches the `payloads/create-metadata.json` sample used in
+  `01 - Create`.
+}

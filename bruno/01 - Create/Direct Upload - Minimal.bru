@@ -1,0 +1,44 @@
+meta {
+  name: Direct Upload - Minimal
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  file: @file(../documents/unclassifiable.txt) @contentType(text/plain)
+  metadata: @file(../payloads/create-metadata-empty.json)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+script:post-response {
+  if (res.body && res.body.document) {
+    bru.setVar("unclassifiableDocumentId", res.body.document.id);
+  }
+}
+
+tests {
+  test("succeeds with no createdBy and empty metadata", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.document.createdBy).to.equal(null);
+    expect(res.body.document.metadata).to.eql({});
+  });
+}
+
+docs {
+  Edge case: `createdBy` is entirely optional (no part sent here) and `metadata` is an
+  empty object - both should be accepted without error. This also uses a recipe as the
+  content, which doesn't match any of the fixed classification categories, so once
+  ingestion completes `documentType` should end up as "unknown" - check via "Get Metadata
+  - Latest" in `03 - Retrieve` (with `documentId` temporarily overridden to
+  `{{unclassifiableDocumentId}}`).
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Get Metadata - Version Not Found (404)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/document/metadata/{{documentId}}/999
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 404 for a version that was never created", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.body.detail).to.equal("Document version not found");
+  });
+}
+
+docs {
+  A document that exists but has never reached version 999.
+}

@@ -1,0 +1,11 @@
+meta {
+  name: 05 - Delete
+  seq: 5
+}
+
+docs {
+  Tears down a document entirely: terminates its Temporal workflow, deletes all vector
+  store chunks, removes every version's object from MinIO (`{{documentId}}/*` prefix, not
+  just the latest), deletes the Mongo document, and deletes its revision history. There is
+  no soft-delete/undo.
+}

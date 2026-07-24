@@ -1,0 +1,16 @@
+meta {
+  name: 01 - Create
+  seq: 1
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  Both creation paths (mirroring `POST`/`PUT /document` in `docs/API.md`), plus the two
+  obvious 400 validation cases. Run "Direct Upload (PUT)" first if you want `{{documentId}}`
+  populated for the other folders - its post-response script saves the created id and
+  version as collection variables so the rest of the collection can reuse them without
+  manual copy-pasting.
+}

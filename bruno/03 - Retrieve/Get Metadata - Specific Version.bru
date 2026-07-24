@@ -1,0 +1,30 @@
+meta {
+  name: Get Metadata - Specific Version
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/document/metadata/{{documentId}}/1
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns the version-1 revision snapshot", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.documents[0].version).to.equal(1);
+    expect(res.body.documents[0].status).to.equal(null);
+  });
+}
+
+docs {
+  Looks up `document_revisions` instead of the live `documents` collection - `status` is
+  intentionally `null` here (it's a live-workflow concept, not part of a point-in-time
+  version snapshot).
+}

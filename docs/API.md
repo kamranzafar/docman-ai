@@ -1,7 +1,7 @@
 # API Reference
 
 Base URL: `http://localhost:8088` (default; see [`docs/SETUP.md`](SETUP.md#configuration-reference)
-for how the port is configured). All endpoints are under `/document`. There is no authentication —
+for how the port is configured). All endpoints are under `/api/v1/document`. There is no authentication —
 this is a reference implementation.
 
 ## Conventions
@@ -41,7 +41,7 @@ summarization completes.
 
 `createdAt`/`updatedAt` are set by the system (UTC timestamps); `createdBy`/`updatedBy` are
 optional, caller-supplied identifiers (e.g. a username), and are otherwise `null`. `version`
-starts at `1` and only increments on a user-driven change via `PUT /document/{id}` — see
+starts at `1` and only increments on a user-driven change via `PUT /api/v1/document/{id}` — see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-versioning--revision-history) for exactly what
 does and doesn't bump it.
 
@@ -56,7 +56,7 @@ body:
   "title": "Not Found",
   "status": 404,
   "detail": "Document not found",
-  "instance": "/document/metadata"
+  "instance": "/api/v1/document/metadata"
 }
 ```
 
@@ -64,12 +64,12 @@ body:
 |--------|------|
 | 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question) |
 | 404    | Document id doesn't exist |
-| 409    | An update (`POST`/`PUT /document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
+| 409    | An update (`POST`/`PUT /api/v1/document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
 | 500    | Unhandled server error |
 
 ---
 
-## `POST /document` — create a document, get a presigned upload URL
+## `POST /api/v1/document` — create a document, get a presigned upload URL
 
 Creates the document record and returns a MinIO presigned **PUT** URL. The client uploads the
 file directly to that URL; a Temporal workflow then picks up the upload asynchronously and runs it
@@ -113,14 +113,14 @@ curl -X PUT "<url>" --data-binary @invoice-123.pdf
 ```
 
 ```shell
-curl -X POST http://localhost:8088/document \
+curl -X POST http://localhost:8088/api/v1/document \
   -H "Content-Type: application/json" \
   -d '{"name":"invoice-123.pdf","contentType":"application/pdf","documentType":"invoice","metadata":{"vendor":"acme"}}'
 ```
 
 ---
 
-## `PUT /document` — create and upload in one request
+## `PUT /api/v1/document` — create and upload in one request
 
 Synchronous alternative: the file is sent directly in the request body. Content streams straight
 to MinIO without being buffered into memory server-side. Use this for smaller files or simpler
@@ -134,14 +134,14 @@ clients that can't do a separate presigned upload step.
 | `metadata`  | `application/json` | Arbitrary key/value map (same as `DocumentRequest.metadata`) |
 | `createdBy` | text, optional | Same as `DocumentRequest.createdBy` |
 
-Note: `documentType` cannot be supplied via this endpoint (only via `POST /document`); it stays
+Note: `documentType` cannot be supplied via this endpoint (only via `POST /api/v1/document`); it stays
 `null` until AI classification sets it once ingestion completes.
 
 **Response** `200 OK`: same `DocumentResponse` shape as above, but `status` starts at `CREATED` and
 the workflow (already having its content) proceeds straight through without waiting.
 
 ```shell
-curl -X PUT http://localhost:8088/document \
+curl -X PUT http://localhost:8088/api/v1/document \
   -F "file=@invoice-123.pdf;type=application/pdf" \
   -F 'metadata={"vendor":"acme"};type=application/json' \
   -F "createdBy=alice"
@@ -151,13 +151,13 @@ Max upload size: 100MB (`spring.servlet.multipart.max-file-size`/`max-request-si
 
 ---
 
-## `POST /document/{id}` — update to a new file version, get a presigned upload URL
+## `POST /api/v1/document/{id}` — update to a new file version, get a presigned upload URL
 
-The presigned counterpart to `PUT /document/{id}`, mirroring how `POST /document` relates to
-`PUT /document`: it always expects a new file version — bumps `version`, resets `status` to
+The presigned counterpart to `PUT /api/v1/document/{id}`, mirroring how `POST /api/v1/document` relates to
+`PUT /api/v1/document`: it always expects a new file version — bumps `version`, resets `status` to
 `CREATED`, clears the previous version's vector store chunks, returns a presigned **PUT** URL for
 the new version's file, and starts a new workflow execution that (like creation) polls MinIO until
-the client's upload lands. For a metadata-only change, use `PUT /document/{id}` without a `file`
+the client's upload lands. For a metadata-only change, use `PUT /api/v1/document/{id}` without a `file`
 part instead — this endpoint is only for the "new file" case, since `name`/`contentType` must be
 known upfront to build the presigned URL.
 
@@ -195,16 +195,16 @@ this update lost a concurrency race against another update to the same document 
 retry.
 
 ```shell
-curl -X POST http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X POST http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -H "Content-Type: application/json" \
   -d '{"name":"invoice-123-corrected.pdf","contentType":"application/pdf","metadata":{"vendor":"acme"},"updatedBy":"bob"}'
 ```
 
 ---
 
-## `PUT /document/{id}` — update metadata, or metadata and file
+## `PUT /api/v1/document/{id}` — update metadata, or metadata and file
 
-The direct-upload counterpart to `POST /document/{id}` above — use this one for a metadata-only
+The direct-upload counterpart to `POST /api/v1/document/{id}` above — use this one for a metadata-only
 change (no file part needed), or to replace the file synchronously in the same request instead of
 via a presigned URL. Updates an existing document's metadata, and optionally replaces its file
 content. Either way,
@@ -223,7 +223,7 @@ why `metadata` is a **full replacement**, not a merge, of the existing map.
 | `file`     | file, optional | no  | If present, replaces the document's content and re-runs the full ingestion workflow (index, summarize, classify) for the new version |
 
 **Response** `200 OK`: `DocumentResponse` wrapping the updated `DocumentDto` (no `url` field — this
-isn't a presigned upload, the file is streamed straight to MinIO like `PUT /document`).
+isn't a presigned upload, the file is streamed straight to MinIO like `PUT /api/v1/document`).
 
 **Errors**: `404` if the id doesn't exist, `400` if the request has none of `metadata`,
 `documentType`, or `file`, `409` if this update lost a concurrency race against another update to
@@ -234,7 +234,7 @@ retry.
 Metadata-only:
 
 ```shell
-curl -X PUT http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X PUT http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -F 'metadata={"metadata":{"vendor":"acme","region":"us"},"updatedBy":"bob"};type=application/json'
 ```
 
@@ -242,14 +242,14 @@ Metadata + a new file (bumps `version`, resets `status` to `CREATED`, and starts
 run):
 
 ```shell
-curl -X PUT http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X PUT http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -F 'metadata={"metadata":{"vendor":"acme"},"updatedBy":"bob"};type=application/json' \
   -F "file=@invoice-123-corrected.pdf;type=application/pdf"
 ```
 
 ---
 
-## `GET /document/metadata/{id}` — fetch a document's metadata
+## `GET /api/v1/document/metadata/{id}` — fetch a document's metadata
 
 **Path parameters**: `id` — the document UUID. Optional trailing `version` — a specific past
 version's snapshot instead of the latest, read from the revision history (see
@@ -266,14 +266,14 @@ snapshot's `status` is always `null` — it's not a live-workflow concept.
 exist), `400` if the id isn't a valid UUID.
 
 ```shell
-curl "http://localhost:8088/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8088/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 # a specific past version:
-curl "http://localhost:8088/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
+curl "http://localhost:8088/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
 ```
 
 ---
 
-## `GET /document/content/{id}` — get a presigned download URL
+## `GET /api/v1/document/content/{id}` — get a presigned download URL
 
 **Path parameters**: `id` — the document UUID. Optional trailing `version` — a specific past
 version's file instead of the latest.
@@ -292,16 +292,16 @@ itself first and returns its own `404` if that version never had a file uploaded
 metadata-only revision) — the latest-version path doesn't do this extra check.
 
 ```shell
-curl "http://localhost:8088/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8088/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 # then:
 curl "<returned url>" -o invoice-123.pdf
 # a specific past version:
-curl "http://localhost:8088/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
+curl "http://localhost:8088/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
 ```
 
 ---
 
-## `POST /document/ask` — ask a question (RAG)
+## `POST /api/v1/document/ask` — ask a question (RAG)
 
 Vector similarity search over indexed document chunks, with `llama3.1` generating an answer
 grounded in the retrieved context.
@@ -328,14 +328,14 @@ timeout message.
 **Errors**: `400` if `question` is blank/missing.
 
 ```shell
-curl -X POST http://localhost:8088/document/ask \
+curl -X POST http://localhost:8088/api/v1/document/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What does the invoice from acme cover?"}'
 ```
 
 ---
 
-## `POST /document/search` — structured metadata search
+## `POST /api/v1/document/search` — structured metadata search
 
 Filters documents by exact metadata field values — no need to know OpenSearch query syntax, and no
 way to reach fields outside the `metadata` subtree (the server always resolves a filter key `k` to
@@ -353,7 +353,7 @@ Multiple filters are combined with AND semantics. Maximum 10 filters per request
 Note: a `documentType`/metadata filter here matches the chunk's indexed metadata, which is kept in
 sync with Mongo asynchronously via Kafka (see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) — so it can lag the
-`GET /document/metadata/{id}` value by up to a couple of seconds right after ingestion completes.
+`GET /api/v1/document/metadata/{id}` value by up to a couple of seconds right after ingestion completes.
 
 **Response** `200 OK`: a list of matching chunks' metadata (one entry per indexed chunk, collapsed
 by parent document where possible):
@@ -376,14 +376,14 @@ by parent document where possible):
 nothing matches.
 
 ```shell
-curl -X POST http://localhost:8088/document/search \
+curl -X POST http://localhost:8088/api/v1/document/search \
   -H "Content-Type: application/json" \
   -d '{"filters":{"documentType":"invoice"}}'
 ```
 
 ---
 
-## `DELETE /document/{id}` — delete a document
+## `DELETE /api/v1/document/{id}` — delete a document
 
 Tears down everything associated with a document, **all versions included**:
 
@@ -401,24 +401,24 @@ whose workflow already finished, or whose content was never uploaded, is handled
 are no-ops for the respective cleanup step, not errors).
 
 ```shell
-curl -X DELETE "http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl -X DELETE "http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 ```
 
 ---
 
 ## Endpoint summary
 
-| Method   | Path                                | Purpose                                      |
-|----------|-------------------------------------|-----------------------------------------------|
-| `POST`   | `/document`                         | Create + presigned upload URL                 |
-| `PUT`    | `/document`                         | Create + direct multipart upload              |
-| `POST`   | `/document/{id}`                    | Update to a new file version + presigned upload URL |
-| `PUT`    | `/document/{id}`                    | Update metadata, or metadata + direct file upload (new version) |
-| `GET`    | `/document/metadata/{id}[/{version}]` | Fetch document metadata (latest or a specific version) |
-| `GET`    | `/document/content/{id}[/{version}]`  | Presigned download URL (latest or a specific version) |
-| `POST`   | `/document/ask`                     | RAG question answering                        |
-| `POST`   | `/document/search`                  | Structured metadata search                    |
-| `DELETE` | `/document/{id}`                    | Delete document, all versions (full cleanup)  |
+| Method   | Path                                          | Purpose                                              |
+|----------|-----------------------------------------------|-------------------------------------------------------|
+| `POST`   | `/api/v1/document`                            | Create + presigned upload URL                          |
+| `PUT`    | `/api/v1/document`                            | Create + direct multipart upload                       |
+| `POST`   | `/api/v1/document/{id}`                       | Update to a new file version + presigned upload URL    |
+| `PUT`    | `/api/v1/document/{id}`                       | Update metadata, or metadata + direct file upload (new version) |
+| `GET`    | `/api/v1/document/metadata/{id}[/{version}]`  | Fetch document metadata (latest or a specific version) |
+| `GET`    | `/api/v1/document/content/{id}[/{version}]`   | Presigned download URL (latest or a specific version)  |
+| `POST`   | `/api/v1/document/ask`                        | RAG question answering                                 |
+| `POST`   | `/api/v1/document/search`                     | Structured metadata search                              |
+| `DELETE` | `/api/v1/document/{id}`                       | Delete document, all versions (full cleanup)           |
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/
 OpenSearch debug requests) is in the `bruno/` directory at the repository root.

@@ -1,0 +1,48 @@
+meta {
+  name: Direct Upload (PUT)
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  file: @file(../documents/invoice.txt) @contentType(text/plain)
+  metadata: @file(../payloads/create-metadata.json)
+  createdBy: alice
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+script:post-response {
+  if (res.body && res.body.document) {
+    bru.setVar("documentId", res.body.document.id);
+    bru.setVar("documentVersion", res.body.document.version);
+  }
+}
+
+tests {
+  test("returns 200 with status CREATED and version 1", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.document.status).to.equal("CREATED");
+    expect(res.body.document.version).to.equal(1);
+    expect(res.body.document.createdBy).to.equal("alice");
+  });
+}
+
+docs {
+  Synchronous create: the file is uploaded directly in this request, so the ingestion
+  workflow doesn't have to wait for a separate upload. Poll "Get Metadata - Latest" in
+  `03 - Retrieve` afterward to watch `status` progress to `INDEXED` and `documentType`
+  get classified (`invoices`, for this sample content).
+
+  Sets `documentId`/`documentVersion` collection variables from the response, so the rest
+  of the collection can target this document without manual edits.
+}

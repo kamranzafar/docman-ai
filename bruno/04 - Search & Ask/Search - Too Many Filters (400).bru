@@ -1,0 +1,40 @@
+meta {
+  name: Search - Too Many Filters (400)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filters": {
+      "f1": "1", "f2": "2", "f3": "3", "f4": "4", "f5": "5",
+      "f6": "6", "f7": "7", "f8": "8", "f9": "9", "f10": "10", "f11": "11"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("caps filters at QUERY_MAX_FILTERS (10)", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.body.detail).to.equal("Filters exceed maximum count of 10");
+  });
+}
+
+docs {
+  11 filters, one over `QueryConstants.QUERY_MAX_FILTERS`.
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Get Metadata - Latest
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/document/metadata/{{documentId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns the live document with a status", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.documents).to.have.lengthOf(1);
+    expect(res.body.documents[0].status).to.not.equal(null);
+  });
+}
+
+docs {
+  No version segment - always the current version, live from the `documents` collection
+  (so `status` reflects the in-progress workflow, unlike a specific-version lookup).
+}
