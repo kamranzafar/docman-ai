@@ -64,6 +64,7 @@ body:
 |--------|------|
 | 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question) |
 | 404    | Document id doesn't exist |
+| 409    | An update (`POST`/`PUT /document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
 | 500    | Unhandled server error |
 
 ---
@@ -188,7 +189,10 @@ known upfront to build the presigned URL.
 curl -X PUT "<url>" --data-binary @invoice-123-corrected.pdf
 ```
 
-**Errors**: `404` if the id doesn't exist, `400` if `name` or `contentType` is missing.
+**Errors**: `404` if the id doesn't exist, `400` if `name` or `contentType` is missing, `409` if
+this update lost a concurrency race against another update to the same document (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-versioning--revision-history)) — reload and
+retry.
 
 ```shell
 curl -X POST http://localhost:8088/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
@@ -222,7 +226,10 @@ why `metadata` is a **full replacement**, not a merge, of the existing map.
 isn't a presigned upload, the file is streamed straight to MinIO like `PUT /document`).
 
 **Errors**: `404` if the id doesn't exist, `400` if the request has none of `metadata`,
-`documentType`, or `file`.
+`documentType`, or `file`, `409` if this update lost a concurrency race against another update to
+the same document (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-versioning--revision-history)) — reload and
+retry.
 
 Metadata-only:
 

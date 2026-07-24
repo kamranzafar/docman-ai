@@ -43,6 +43,11 @@ public class DocmanExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponse(ex, HttpStatus.NOT_FOUND, request);
     }
 
+    @ExceptionHandler(DocumentConflictException.class)
+    public ResponseEntity<Object> handleDocumentConflictException(DocumentConflictException ex, WebRequest request) {
+        return buildResponse(ex, HttpStatus.CONFLICT, request);
+    }
+
     private ResponseEntity<Object> buildResponse(Exception ex, HttpStatus status, WebRequest request) {
         return super.handleExceptionInternal(ex, ProblemDetail.forStatusAndDetail(status, ex.getMessage()),
                 new HttpHeaders(), status, request);

@@ -35,7 +35,9 @@ without blocking the client that uploaded the document.
   (`createdAt`/`createdBy`/`updatedAt`/`updatedBy`) track who changed what and when. A new file
   version re-runs the full ingestion workflow (index, summarize, classify), while a metadata-only
   update just patches the vector store. Every version's file is stored independently in MinIO and
-  can be fetched by version number
+  can be fetched by version number. Updates use an optimistic-concurrency compare-and-swap on
+  `version`, so two concurrent updates to the same document can't silently overwrite one another —
+  the loser gets a `409 Conflict` instead
 - **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
   down every version's MinIO object, the vector store entries, the Mongo record and its revision
   history, and cancels any still-running ingestion workflow for that document)
