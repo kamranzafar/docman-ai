@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,4 +36,9 @@ public class DocumentDto {
     String status;
     String documentType;
     Map<String, Object> metadata;
+    Instant createdAt;
+    String createdBy;
+    Instant updatedAt;
+    String updatedBy;
+    int version;
 }

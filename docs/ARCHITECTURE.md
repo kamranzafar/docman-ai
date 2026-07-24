@@ -29,7 +29,7 @@ flowchart LR
 |-----------------------|-----------------------------------|-----------------------------------------------------------------------|
 | API / bootstrap        | Spring Boot 3.5, Java 21          | REST layer, application wiring, configuration                        |
 | Object storage          | MinIO                             | Raw document bytes, accessed via presigned or server-mediated uploads |
-| Metadata store           | MongoDB (Spring Data MongoDB)      | `Document` records: id, name, content type, status, document type, metadata |
+| Metadata store           | MongoDB (Spring Data MongoDB)      | `Document` records (id, name, content type, status, document type, metadata, audit fields, version) plus a `document_revisions` collection tracking every past version's snapshot |
 | Vector store              | OpenSearch                        | Chunk embeddings + per-chunk metadata for RAG and structured search   |
 | Workflow orchestration     | Temporal                          | Durable, retryable ingestion pipeline                                |
 | Eventing                   | Kafka                             | Lifecycle notifications for every ingestion stage, plus a metadata-sync trigger topic |
@@ -57,11 +57,11 @@ flowchart BT
 
 | Module                | Contents                                                                                   |
 |-------------------------|-----------------------------------------------------------------------------------------------|
-| **docman-domain**        | The `Document` entity (Mongo-mapped), `DocumentStatus`, `DocumentType` (the fixed classification category set), all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
-| **docman-persistence**    | `DocumentMetadataRepository` — the Spring Data MongoDB repository for `Document`               |
-| **docman-service**        | Service interfaces *and* implementations: `DocumentService` (also publishes the metadata-sync Kafka trigger on every update), `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch; also the metadata-only vector store sync), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (RAG-based summarization over the vector store), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
-| **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates workflows from the API layer |
-| **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST), exception handling, Kafka/MinIO/executor configuration, `DocumentIndexSyncConsumer` (the metadata-sync Kafka listener) |
+| **docman-domain**        | The `Document` entity (Mongo-mapped, now with `createdAt`/`createdBy`/`updatedAt`/`updatedBy`/`version`), `DocumentRevision` (a per-version snapshot), `DocumentStatus`, `DocumentType` (the fixed classification category set), all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentUpdateRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
+| **docman-persistence**    | `DocumentMetadataRepository` and `DocumentRevisionRepository` — the Spring Data MongoDB repositories for `Document` and `DocumentRevision`      |
+| **docman-service**        | Service interfaces *and* implementations: `DocumentService` (create/update, version bumps + revision snapshots, also publishes the metadata-sync Kafka trigger), `ObjectStoreService` (version-scoped MinIO keys), `DocumentIndexService` (Tika + embeddings + OpenSearch; also the metadata-only vector store sync), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (RAG-based summarization over the vector store), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
+| **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates a **version-scoped** workflow execution per document version |
+| **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST, including the update API and version-aware GETs), exception handling, Kafka/MinIO/executor configuration, `DocumentIndexSyncConsumer` (the metadata-sync Kafka listener) |
 
 Only **docman-api** produces an executable artifact (a Spring Boot fat jar via
 `spring-boot-maven-plugin`); the other four build plain library jars.
@@ -90,12 +90,19 @@ stateDiagram-v2
 `UPDATED` also exists on the enum as a generic "metadata was updated" status, used by the shared
 `update()` service method independent of the ingestion pipeline.
 
+`status` and `version` are independent axes: `status` tracks where the *current* version is in
+the ingestion pipeline; `version` is a monotonically increasing counter that only moves on
+user-driven changes (a new file, or a metadata update via `PUT /document/{id}`) — see
+[Document Versioning & Revision History](#document-versioning--revision-history). A new file
+version resets `status` back to `CREATED` and re-enters this same state machine.
+
 ## Ingestion Workflow
 
-`DocumentWorkflowManager.createWorkflow` starts one `DocumentWorkflow` execution per document,
-using a **deterministic workflow ID** (`doc-wf-{documentId}`) — this lets `DELETE /document` look
-up and terminate the workflow for a specific document without needing to store the workflow ID
-anywhere.
+`DocumentWorkflowManager.createWorkflow` starts one `DocumentWorkflow` execution per document
+**version**, using a **deterministic workflow ID** (`doc-wf-{documentId}-v{version}`) — this lets
+`DELETE /document/{id}` look up and terminate the current version's workflow without needing to
+store the workflow ID anywhere, and lets a new file version start its own independent execution
+(under a new ID) rather than depending on the previous version's run having already closed.
 
 ```mermaid
 sequenceDiagram
@@ -156,6 +163,65 @@ Key design points:
   classification are supplementary).
 - **Every step publishes a Kafka event** (`documents` topic) so external systems can observe
   ingestion progress without polling the API.
+
+## Document Versioning & Revision History
+
+Every `Document` carries `createdAt`/`createdBy` (set once, at creation) and
+`updatedAt`/`updatedBy` (touched only by user-driven changes) alongside a `version` counter that
+starts at `1` and increments exactly when a `POST`/`PUT /document/{id}` update includes a new
+file, or changes metadata/documentType without one. Internal system saves — the workflow's own
+status transitions, summary merge, and classification merge, all still going through the original
+`DocumentService.update(DocumentDto)` — deliberately leave `version`/`updatedAt`/`updatedBy`
+untouched, so the version count reflects user intent only, not every write the pipeline happens
+to make along the way.
+
+Every version bump (`DocumentServiceImpl.updateDocument`) also writes a `DocumentRevision`
+snapshot to the `document_revisions` collection — `documentId`, `version`, `name`, `contentType`,
+`documentType`, `metadata`, `updatedAt`, `updatedBy`, and whether this version included a new
+file. `create()` writes a version-1 revision too, so history is complete from the start.
+`GET /document/metadata/{id}/{version}` reads directly from this collection instead of the live
+`Document` (a revision has no `status` — that's a live-workflow concept, not part of a version
+snapshot).
+
+Updates come in the same two flavors as creation does, mirroring `POST`/`PUT /document`:
+
+- **`PUT /document/{id}`** (multipart: a `metadata` part shaped like `DocumentUpdateRequest`, plus
+  an optional `file` part) handles both cases directly:
+  - **Metadata-only** (`documentType`/`metadata`/`updatedBy`, no file): bumps `version`, replaces
+    the metadata map outright rather than merging it (an update that omits a key drops it,
+    including system-added ones like `summary`, unless the caller re-supplies it — see
+    [`docs/API.md`](API.md) for the confirmed rationale), and triggers the existing
+    [metadata-sync](#keeping-vector-store-metadata-in-sync) Kafka event so the change reaches the
+    vector store without a reindex.
+  - **Metadata + file**: same version bump, plus a `name`/`contentType` change and `status`
+    resetting to `CREATED`. The controller calls `DocumentIndexService.deleteIndex` to clear the
+    *previous* version's chunks first — indexing always assigns fresh chunk IDs, so without this
+    step old and new versions' chunks would both remain and pollute search/RAG — uploads the new
+    content, then starts a new workflow execution for this version: the exact same ingestion
+    pipeline as initial creation (index, summarize, classify). The metadata-sync trigger is
+    deliberately skipped for this case: syncing now would be redundant (the new version's own
+    indexing is about to write fresh metadata anyway), and testing showed it can race the
+    concurrent `deleteIndex` call and fail with an OpenSearch version conflict on the same chunk.
+- **`POST /document/{id}`** is the presigned-upload counterpart, for when a new file version is
+  intended but the caller wants to upload it directly to MinIO rather than through this API (large
+  files, browser clients, etc.) — same version bump, metadata replacement, `deleteIndex` cleanup,
+  and new workflow execution as the file case above, but it returns a presigned **PUT** URL instead
+  of accepting the bytes, and the new workflow's upload-wait step picks up the content once the
+  client uploads it (exactly like `POST /document` on creation). Since the presigned URL needs the
+  new object key upfront, this endpoint always requires `name`/`contentType` in the request body —
+  unlike `PUT /document/{id}`, it has no metadata-only mode.
+
+MinIO objects are stored per version — `{documentId}/{version}/{name}` — so every version's file
+remains independently retrievable; `ObjectStoreServiceImpl` builds this key from
+`DocumentDto.getVersion()` for every operation. A full `DELETE /document/{id}` removes every
+version's object (a MinIO prefix list + bulk delete under `{documentId}/`), not just the current
+one, along with all of that document's `DocumentRevision`s.
+
+`GET /document/metadata/{id}` and `GET /document/content/{id}` both accept an optional trailing
+`/{version}` segment to look up a specific past version instead of the latest. A content lookup
+for a specific version also checks MinIO object existence first and 404s if that version never
+had a file uploaded (e.g. a metadata-only revision) — the "latest" path doesn't do this extra
+check, matching its existing behavior.
 
 ## Document Summarization & Classification
 
@@ -261,8 +327,9 @@ sync](#keeping-vector-store-metadata-in-sync) described above.
 ## Presigned URLs
 
 `POST /document` returns a MinIO presigned **PUT** URL — the client uploads content directly to
-object storage, and the workflow's upload-wait step picks it up once it lands. `GET
-/document/content` returns a presigned **GET** URL for downloading. Both are genuinely
+object storage, and the workflow's upload-wait step picks it up once it lands. `POST
+/document/{id}` does the same for a new version of an existing document. `GET
+/document/content` returns a presigned **GET** URL for downloading. All are genuinely
 method-locked (the signature only validates for its intended HTTP method) and expire independently
 (`minio.presigned.upload-url-expiry` / `download-url-expiry`, see
 [`docs/SETUP.md`](SETUP.md#configuration-reference)).
@@ -270,6 +337,9 @@ method-locked (the signature only validates for its intended HTTP method) and ex
 `PUT /document` is the alternative, synchronous path: the client sends the file directly in the
 request body (multipart), and the server streams it straight to MinIO without buffering the whole
 file in memory.
+
+Every object key includes the document's version — `{documentId}/{version}/{name}` — see
+[Document Versioning & Revision History](#document-versioning--revision-history).
 
 ## Error Handling
 

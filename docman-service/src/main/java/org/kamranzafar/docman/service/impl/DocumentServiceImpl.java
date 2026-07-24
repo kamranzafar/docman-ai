@@ -24,16 +24,22 @@ import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentRequest;
+import org.kamranzafar.docman.model.DocumentRevision;
 import org.kamranzafar.docman.model.DocumentStatus;
+import org.kamranzafar.docman.model.DocumentUpdateRequest;
 import org.kamranzafar.docman.repository.DocumentMetadataRepository;
+import org.kamranzafar.docman.repository.DocumentRevisionRepository;
 import org.kamranzafar.docman.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,6 +51,8 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
+    @Autowired
+    private DocumentRevisionRepository documentRevisionRepository;
     @Autowired
     private DocumentMapper documentMapper;
     @Autowired
@@ -59,9 +67,19 @@ public class DocumentServiceImpl implements DocumentService {
             document.setMetadata(new HashMap<>());
         }
 
+        Instant now = Instant.now();
+        document.setVersion(1);
+        document.setCreatedAt(now);
+        document.setCreatedBy(request.getCreatedBy());
+        document.setUpdatedAt(now);
+        document.setUpdatedBy(request.getCreatedBy());
+
         log.info("Creating a new document with id {}", document.getId());
 
-        return documentMapper.toDto(saveDocument(document, DocumentStatus.CREATED.name()));
+        Document saved = saveDocument(document, DocumentStatus.CREATED.name());
+        saveRevision(saved, true);
+
+        return documentMapper.toDto(saved);
     }
 
     @Transactional
@@ -80,6 +98,67 @@ public class DocumentServiceImpl implements DocumentService {
         return documentMapper.toDto(saved);
     }
 
+    @Transactional
+    @Override
+    public DocumentDto updateDocument(UUID id, DocumentUpdateRequest request, String newFileName,
+                                       String newFileContentType) {
+        log.info("Updating document {} (user-driven, version bump)", id);
+
+        Optional<Document> op = documentMetadataRepository.findById(id);
+        if (op.isEmpty()) {
+            throw new DocumentNotFoundException("Document not found");
+        }
+
+        Document document = op.get();
+        boolean fileIncluded = StringUtils.hasText(newFileName);
+
+        document.setVersion(document.getVersion() + 1);
+        document.setMetadata(request.getMetadata() != null ? new HashMap<>(request.getMetadata()) : new HashMap<>());
+        if (StringUtils.hasText(request.getDocumentType())) {
+            document.setDocumentType(request.getDocumentType());
+        }
+        document.setUpdatedAt(Instant.now());
+        if (StringUtils.hasText(request.getUpdatedBy())) {
+            document.setUpdatedBy(request.getUpdatedBy());
+        }
+
+        if (fileIncluded) {
+            document.setName(newFileName);
+            document.setContentType(newFileContentType);
+            // A new file re-enters the same ingestion pipeline as a brand new document.
+            document.setStatus(DocumentStatus.CREATED.name());
+        }
+
+        documentMetadataRepository.save(document);
+        saveRevision(document, fileIncluded);
+
+        // Skip the metadata-sync trigger when a file is included: the caller is about to
+        // delete and rebuild this document's chunks from scratch via the new version's
+        // workflow, so syncing now would be redundant - and worse, can race with that
+        // deletion and fail with an OpenSearch version conflict on the same chunk.
+        if (!fileIncluded) {
+            kafkaTemplate.send(metadataSyncTopic, document.getId().toString());
+        }
+
+        return documentMapper.toDto(document);
+    }
+
+    private void saveRevision(Document document, boolean fileUpdated) {
+        DocumentRevision revision = new DocumentRevision();
+        revision.setDocumentId(document.getId());
+        revision.setVersion(document.getVersion());
+        revision.setName(document.getName());
+        revision.setContentType(document.getContentType());
+        revision.setDocumentType(document.getDocumentType());
+        Map<String, Object> metadata = document.getMetadata();
+        revision.setMetadata(metadata != null ? new HashMap<>(metadata) : new HashMap<>());
+        revision.setUpdatedAt(document.getUpdatedAt());
+        revision.setUpdatedBy(document.getUpdatedBy());
+        revision.setFileUpdated(fileUpdated);
+
+        documentRevisionRepository.save(revision);
+    }
+
     @NotNull
     private Document saveDocument(Document document, String status) {
         log.debug("Saving document with id {}", document.getId());
@@ -95,6 +174,7 @@ public class DocumentServiceImpl implements DocumentService {
     public void delete(DocumentDto document) {
         log.info("Deleting document with id {}", document.getId());
         documentMetadataRepository.deleteById(document.getId());
+        documentRevisionRepository.deleteByDocumentId(document.getId());
     }
 
     @Override
@@ -106,5 +186,26 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         return documentMapper.toDto(op.get());
+    }
+
+    @Override
+    public DocumentDto findMetadata(UUID id, int version) {
+        log.info("Finding document metadata with id {} at version {}", id, version);
+        Optional<DocumentRevision> op = documentRevisionRepository.findByDocumentIdAndVersion(id, version);
+        if (op.isEmpty()) {
+            throw new DocumentNotFoundException("Document version not found");
+        }
+
+        DocumentRevision revision = op.get();
+        return DocumentDto.builder()
+                .id(revision.getDocumentId())
+                .name(revision.getName())
+                .contentType(revision.getContentType())
+                .documentType(revision.getDocumentType())
+                .metadata(revision.getMetadata())
+                .updatedAt(revision.getUpdatedAt())
+                .updatedBy(revision.getUpdatedBy())
+                .version(revision.getVersion())
+                .build();
     }
 }

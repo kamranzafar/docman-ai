@@ -1,0 +1,35 @@
+meta {
+  name: Update
+  type: http
+  seq: 6
+}
+
+put {
+  url: http://localhost:8081/document/:id
+  body: multipartForm
+  auth: inherit
+}
+
+params:path {
+  id: f102f673-dc48-46d7-9f50-a2526bf80992
+}
+
+body:multipart-form {
+  metadata: @file(update-metadata.json)
+  ~file: @file(test.txt)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Updates a document's metadata, and optionally its file content, bumping its `version`
+  and recording a revision snapshot. The `file` part is disabled by default (~) - a
+  metadata-only update needs just the `metadata` part; enable `file` too to also replace
+  the document's content, which re-runs the full ingestion workflow (index, summarize,
+  classify) for the new version.
+
+  See `Update Presigned` for the presigned-URL equivalent of the file-update case.
+}

@@ -46,7 +46,7 @@ public class DocumentWorkflowManager {
                 workflowClient.newWorkflowStub(
                         DocumentWorkflow.class,
                         WorkflowOptions.newBuilder()
-                                .setWorkflowId(workflowId(document.getId()))
+                                .setWorkflowId(workflowId(document.getId(), document.getVersion()))
                                 .setTaskQueue("documents")
                                 .build()
                 );
@@ -59,16 +59,17 @@ public class DocumentWorkflowManager {
         return workflowClient.newWorkflowStub(DocumentWorkflow.class, id);
     }
 
-    public void terminateWorkflow(UUID documentId) {
+    public void terminateWorkflow(UUID documentId, int version) {
         try {
-            WorkflowStub.fromTyped(getWorkflow(workflowId(documentId)))
+            WorkflowStub.fromTyped(getWorkflow(workflowId(documentId, version)))
                     .terminate("Document deleted");
         } catch (WorkflowNotFoundException e) {
-            log.debug("No workflow found for document {} (already completed or never started)", documentId);
+            log.debug("No workflow found for document {} version {} (already completed or never started)",
+                    documentId, version);
         }
     }
 
-    private String workflowId(UUID documentId) {
-        return String.format("doc-wf-%s", documentId);
+    private String workflowId(UUID documentId, int version) {
+        return String.format("doc-wf-%s-v%d", documentId, version);
     }
 }

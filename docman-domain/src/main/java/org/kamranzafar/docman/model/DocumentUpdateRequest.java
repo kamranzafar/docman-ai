@@ -16,18 +16,18 @@
 
 package org.kamranzafar.docman.model;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.util.Map;
 
 @Data
-public class DocumentRequest {
-    @NotBlank(message = "Name is mandatory")
-    String name;
-    @NotBlank(message = "Content Type is mandatory")
-    String contentType;
-    String documentType;
+public class DocumentUpdateRequest {
     Map<String, Object> metadata;
-    String createdBy;
+    String documentType;
+    String updatedBy;
+    // Only used by the presigned-upload update flow (POST /document/{id}), where the new
+    // file's identity must be known upfront to generate the presigned URL - the multipart
+    // update (PUT /document/{id}) derives these from the uploaded file part instead.
+    String name;
+    String contentType;
 }

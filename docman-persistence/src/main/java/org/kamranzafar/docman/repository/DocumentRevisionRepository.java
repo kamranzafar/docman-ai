@@ -15,28 +15,16 @@
  * limitations under the License.
  */
 
-package org.kamranzafar.docman.model;
+package org.kamranzafar.docman.repository;
 
-import lombok.Data;
-import org.springframework.data.annotation.Id;
+import org.kamranzafar.docman.model.DocumentRevision;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.time.Instant;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-@org.springframework.data.mongodb.core.mapping.Document(collection = "documents")
-@Data
-public class Document {
-    @Id
-    UUID id;
-    String name;
-    String contentType;
-    String status;
-    String documentType;
-    Map<String, Object> metadata;
-    Instant createdAt;
-    String createdBy;
-    Instant updatedAt;
-    String updatedBy;
-    int version;
+public interface DocumentRevisionRepository extends MongoRepository<DocumentRevision, String> {
+    Optional<DocumentRevision> findByDocumentIdAndVersion(UUID documentId, int version);
+
+    void deleteByDocumentId(UUID documentId);
 }

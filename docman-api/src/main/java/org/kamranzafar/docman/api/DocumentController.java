@@ -19,6 +19,7 @@ package org.kamranzafar.docman.api;
 
 import jakarta.validation.Valid;
 import org.kamranzafar.docman.exception.DocmanException;
+import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.*;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentSearchService;
@@ -76,11 +77,13 @@ public class DocumentController {
 
     @PutMapping
     public ResponseEntity<?> create(@RequestPart("file") MultipartFile file,
-                                    @RequestPart Map<String, Object> metadata) {
+                                    @RequestPart Map<String, Object> metadata,
+                                    @RequestPart(value = "createdBy", required = false) String createdBy) {
         DocumentRequest documentRequest = new DocumentRequest();
         documentRequest.setName(file.getOriginalFilename());
         documentRequest.setContentType(file.getContentType());
         documentRequest.setMetadata(metadata);
+        documentRequest.setCreatedBy(createdBy);
 
         DocumentDto document = documentService.create(documentRequest);
 
@@ -91,6 +94,72 @@ public class DocumentController {
         }
 
         DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setDocument(document);
+
+        documentWorkflowManager.createWorkflow(document);
+
+        return ResponseEntity.ok(documentResponse);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable String id,
+                                     @RequestPart("metadata") DocumentUpdateRequest updateRequest,
+                                     @RequestPart(value = "file", required = false) MultipartFile file) {
+        UUID documentId = parseId(id);
+
+        boolean fileIncluded = file != null && !file.isEmpty();
+        boolean hasMetadataChange = updateRequest.getMetadata() != null
+                || StringUtils.hasText(updateRequest.getDocumentType());
+        if (!fileIncluded && !hasMetadataChange) {
+            throw new DocmanException("Update request must include metadata, documentType, or a file");
+        }
+
+        DocumentDto document = documentService.updateDocument(
+                documentId,
+                updateRequest,
+                fileIncluded ? file.getOriginalFilename() : null,
+                fileIncluded ? file.getContentType() : null);
+
+        if (fileIncluded) {
+            // A new file is a new version's content - clear the previous version's
+            // chunks before the new version's workflow indexes fresh ones, so search/RAG
+            // never mixes content from two versions.
+            documentIndexService.deleteIndex(document);
+            try {
+                objectStoreService.saveDocumentContent(document, file.getInputStream(), file.getSize());
+            } catch (IOException e) {
+                throw new DocmanException(e.getMessage(), e);
+            }
+            documentWorkflowManager.createWorkflow(document);
+        }
+
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setDocument(document);
+
+        return ResponseEntity.ok(documentResponse);
+    }
+
+    @PostMapping("/{id}")
+    public ResponseEntity<?> updatePresigned(@PathVariable String id,
+                                              @RequestBody DocumentUpdateRequest updateRequest) {
+        UUID documentId = parseId(id);
+
+        if (!StringUtils.hasText(updateRequest.getName()) || !StringUtils.hasText(updateRequest.getContentType())) {
+            throw new DocmanException("name and contentType are mandatory for a presigned update");
+        }
+
+        DocumentDto document = documentService.updateDocument(
+                documentId, updateRequest, updateRequest.getName(), updateRequest.getContentType());
+
+        // Same reasoning as the multipart update: a new file version means the previous
+        // version's chunks need clearing before the new version's workflow indexes fresh
+        // ones. The client hasn't uploaded yet, but the workflow's upload-wait step will
+        // pick up the content once it lands, exactly like POST /document.
+        documentIndexService.deleteIndex(document);
+
+        String url = objectStoreService.presignedUploadUrl(document);
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setUrl(url);
         documentResponse.setDocument(document);
 
         documentWorkflowManager.createWorkflow(document);
@@ -133,17 +202,31 @@ public class DocumentController {
         return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getFilters()));
     }
 
-    @GetMapping("/metadata/{id}")
-    public ResponseEntity<?> getMetadata(@PathVariable String id) {
+    @GetMapping({"/metadata/{id}", "/metadata/{id}/{version}"})
+    public ResponseEntity<?> getMetadata(@PathVariable String id,
+                                          @PathVariable(required = false) Integer version) {
+        DocumentDto document = version != null
+                ? documentService.findMetadata(parseId(id), version)
+                : documentService.findMetadata(parseId(id));
+
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-        response.setDocuments(Collections.singletonList(documentService.findMetadata(parseId(id))));
+        response.setDocuments(Collections.singletonList(document));
 
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/content/{id}")
-    public ResponseEntity<?> getContent(@PathVariable String id) {
-        DocumentDto document = documentService.findMetadata(parseId(id));
+    @GetMapping({"/content/{id}", "/content/{id}/{version}"})
+    public ResponseEntity<?> getContent(@PathVariable String id,
+                                         @PathVariable(required = false) Integer version) {
+        UUID documentId = parseId(id);
+        DocumentDto document = version != null
+                ? documentService.findMetadata(documentId, version)
+                : documentService.findMetadata(documentId);
+
+        if (version != null && !objectStoreService.documentExists(document)) {
+            throw new DocumentNotFoundException("Document content not found for version " + version);
+        }
+
         String url = objectStoreService.presignedDownloadUrl(document);
 
         DocumentResponse documentResponse = new DocumentResponse();
@@ -156,7 +239,7 @@ public class DocumentController {
     public ResponseEntity<?> delete(@PathVariable String id) {
         DocumentDto document = documentService.findMetadata(parseId(id));
 
-        documentWorkflowManager.terminateWorkflow(document.getId());
+        documentWorkflowManager.terminateWorkflow(document.getId(), document.getVersion());
         documentIndexService.deleteIndex(document);
         objectStoreService.deleteDocumentContent(document);
         documentService.delete(document);

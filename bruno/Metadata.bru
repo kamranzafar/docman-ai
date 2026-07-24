@@ -18,3 +18,9 @@ settings {
   encodeUrl: true
   timeout: 0
 }
+
+docs {
+  Returns the latest metadata by default. Append a version number to look up a specific
+  past version's snapshot instead, e.g. `/document/metadata/:id/1` - 404s if that version
+  doesn't exist.
+}

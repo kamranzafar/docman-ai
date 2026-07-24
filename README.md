@@ -29,9 +29,16 @@ without blocking the client that uploaded the document.
   classification, or future direct edits) publishes to a Kafka topic that a consumer picks up to
   patch the corresponding OpenSearch chunks' metadata in place — no re-embedding, no re-reading the
   file
+- **Document versioning and revision history**: updating a document's metadata, or replacing its
+  file (directly, or via a presigned upload URL just like creation), bumps a `version` counter and
+  records a snapshot in a MongoDB revision history — audit fields
+  (`createdAt`/`createdBy`/`updatedAt`/`updatedBy`) track who changed what and when. A new file
+  version re-runs the full ingestion workflow (index, summarize, classify), while a metadata-only
+  update just patches the vector store. Every version's file is stored independently in MinIO and
+  can be fetched by version number
 - **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
-  down the MinIO object, the vector store entries, the Mongo record, and cancels any still-running
-  ingestion workflow for that document)
+  down every version's MinIO object, the vector store entries, the Mongo record and its revision
+  history, and cancels any still-running ingestion workflow for that document)
 - **Kafka event notifications** for every stage of a document's ingestion lifecycle
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit together, and
