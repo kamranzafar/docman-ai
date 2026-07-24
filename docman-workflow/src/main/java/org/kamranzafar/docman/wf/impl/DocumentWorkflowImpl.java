@@ -117,19 +117,18 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
             activity.notify(document.getId().toString(), "Document Content Uploaded");
 
-            // Indexing and summary generation both only need the uploaded content,
-            // so run them concurrently instead of one after the other.
             Promise<Void> indexPromise = Async.function(() -> {
                 activity.index(document);
                 return null;
             });
-            Promise<String> summaryPromise = Async.function(() -> summaryActivities.get().generateSummary(document));
 
             indexPromise.get();
             document.setStatus(DocumentStatus.INDEXED.name());
 
-            // Classification only needs the document to be indexed, not the summary,
-            // so it's kicked off now and awaited later alongside the summary result.
+            // Summary and classification both query the vector store for this
+            // document's own chunks, so neither can start until indexing has written
+            // them - they run concurrently with each other instead of with indexing.
+            Promise<String> summaryPromise = Async.function(() -> summaryActivities.get().generateSummary(document));
             Promise<String> classificationPromise = Async.function(() -> classificationActivities.get().classifyDocument(document));
 
             try {

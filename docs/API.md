@@ -28,7 +28,7 @@ Every endpoint that returns a document uses this shape (`DocumentDto`):
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-lifecycle)). `documentType` starts out as
 whatever the caller optionally supplied at creation, then gets overwritten once ingestion finishes:
 an AI classification step (see
-[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-classification)) assigns one of `statements`,
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) assigns one of `statements`,
 `invoices`, `policy documents`, `compliance certificates`, `insurance documents`, `contracts`, or
 `unknown` if the document doesn't clearly match any of those. `metadata` is an arbitrary map
 supplied by the caller at creation time; the system adds a `summary` key to it once AI
@@ -225,11 +225,10 @@ the OpenSearch field `metadata.k`).
 Multiple filters are combined with AND semantics. Maximum 10 filters per request
 (`QueryConstants.QUERY_MAX_FILTERS`).
 
-Note: a `documentType` filter here matches the value present in the chunk's indexed metadata,
-which is a snapshot taken at indexing time — i.e. whatever the caller supplied in `POST /document`,
-not the value the AI classifier assigns afterward (see
-[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-classification)). To look up a document's
-AI-classified type, use `GET /document/metadata/{id}` instead.
+Note: a `documentType`/metadata filter here matches the chunk's indexed metadata, which is kept in
+sync with Mongo asynchronously via Kafka (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) — so it can lag the
+`GET /document/metadata/{id}` value by up to a couple of seconds right after ingestion completes.
 
 **Response** `200 OK`: a list of matching chunks' metadata (one entry per indexed chunk, collapsed
 by parent document where possible):

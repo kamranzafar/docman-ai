@@ -23,4 +23,10 @@ public interface DocumentIndexService {
     void index(DocumentDto document);
 
     void deleteIndex(DocumentDto document);
+
+    /**
+     * Merges the document's current metadata/documentType into the metadata of its
+     * already-indexed vector store chunks, without touching their embeddings or content.
+     */
+    void updateMetadata(DocumentDto document);
 }

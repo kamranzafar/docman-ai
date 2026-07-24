@@ -18,15 +18,19 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.model.DocumentDto;
+import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentSummaryService;
-import org.kamranzafar.docman.service.ObjectStoreService;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.reader.tika.TikaDocumentReader;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,8 +42,14 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
             Document:
             %s""";
 
+    // Large enough to pull every chunk belonging to a single document
+    // regardless of similarity ranking - the parent_document_id filter below
+    // already scopes candidates to just this document, so this is only an
+    // upper bound, not a real cap in practice.
+    private static final int MAX_CHUNKS = 1000;
+
     @Autowired
-    private ObjectStoreService objectStoreService;
+    private VectorStore vectorStore;
     private final ChatClient chatClient;
 
     public DocumentSummaryServiceImpl(ChatClient.Builder chatClientBuilder) {
@@ -48,16 +58,33 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
 
     @Override
     public String generateSummary(DocumentDto document) {
-        InputStreamResource documentResource = objectStoreService.getDocumentContent(document);
-        TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(documentResource);
-        List<org.springframework.ai.document.Document> documents = tikaDocumentReader.get();
+        // Chunks are already embedded in the vector store from indexing, so
+        // summarization reuses that instead of re-fetching and re-parsing the
+        // raw content from object storage.
+        Filter.Expression documentFilter = new FilterExpressionBuilder()
+                .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
+                .build();
 
-        if (documents.isEmpty() || documents.get(0).getText() == null) {
-            log.info("No extractable text for document {}, skipping summary generation", document.getId());
+        List<org.springframework.ai.document.Document> chunks = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(document.getName())
+                        .filterExpression(documentFilter)
+                        .topK(MAX_CHUNKS)
+                        .build());
+
+        if (chunks.isEmpty()) {
+            log.info("No indexed chunks for document {}, skipping summary generation", document.getId());
             return null;
         }
 
-        String text = documents.get(0).getText();
+        // Chunks come back in similarity order, not document order - restore
+        // reading order before concatenating so the summary reflects the
+        // document's actual structure.
+        String text = chunks.stream()
+                .sorted(Comparator.comparingInt(chunk ->
+                        ((Number) chunk.getMetadata().getOrDefault("chunk_index", 0)).intValue()))
+                .map(org.springframework.ai.document.Document::getText)
+                .collect(Collectors.joining("\n"));
 
         log.info("Generating summary for document {}", document.getId());
 

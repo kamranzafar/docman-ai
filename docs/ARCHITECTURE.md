@@ -32,10 +32,11 @@ flowchart LR
 | Metadata store           | MongoDB (Spring Data MongoDB)      | `Document` records: id, name, content type, status, document type, metadata |
 | Vector store              | OpenSearch                        | Chunk embeddings + per-chunk metadata for RAG and structured search   |
 | Workflow orchestration     | Temporal                          | Durable, retryable ingestion pipeline                                |
-| Eventing                   | Kafka                             | Lifecycle notifications for every ingestion stage                    |
+| Eventing                   | Kafka                             | Lifecycle notifications for every ingestion stage, plus a metadata-sync trigger topic |
 | Text extraction              | Apache Tika (via Spring AI)        | Extracts text from PDF/DOC/TXT/etc.                                  |
 | Embeddings                    | Ollama `nomic-embed-text`          | 768-dimension vectors for chunked document text                      |
-| Chat / summarization / RAG      | Ollama `llama3.1`                  | Answers questions (RAG) and generates document summaries             |
+| Chat / RAG answers                | Ollama `llama3.1`                  | Answers questions grounded in indexed document content               |
+| Document summarization            | Ollama `llama3.1` + OpenSearch      | Generates a 2-3 sentence summary via retrieval over the document's own indexed chunks |
 | Document classification         | Ollama `llama3.1` (temperature `0`) + OpenSearch | Assigns `documentType` from a fixed category set, via retrieval over the document's own indexed chunks |
 | DTO ↔ entity mapping              | MapStruct                          | Generates the `Document` ⇄ `DocumentDto`/`DocumentRequest` mappers at compile time |
 
@@ -58,9 +59,9 @@ flowchart BT
 |-------------------------|-----------------------------------------------------------------------------------------------|
 | **docman-domain**        | The `Document` entity (Mongo-mapped), `DocumentStatus`, `DocumentType` (the fixed classification category set), all DTOs (`DocumentDto`, `DocumentRequest`, `DocumentResponse`, `DocumentSearchRequest`, `DocumentSearchResponse`), `QueryConstants`, and the MapStruct `DocumentMapper` |
 | **docman-persistence**    | `DocumentMetadataRepository` — the Spring Data MongoDB repository for `Document`               |
-| **docman-service**        | Service interfaces *and* implementations: `DocumentService`, `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (Ollama summarization), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
+| **docman-service**        | Service interfaces *and* implementations: `DocumentService` (also publishes the metadata-sync Kafka trigger on every update), `ObjectStoreService` (MinIO), `DocumentIndexService` (Tika + embeddings + OpenSearch; also the metadata-only vector store sync), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (RAG-based summarization over the vector store), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
 | **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates workflows from the API layer |
-| **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST), exception handling, Kafka/MinIO/executor configuration |
+| **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST), exception handling, Kafka/MinIO/executor configuration, `DocumentIndexSyncConsumer` (the metadata-sync Kafka listener) |
 
 Only **docman-api** produces an executable artifact (a Spring Boot fat jar via
 `spring-boot-maven-plugin`); the other four build plain library jars.
@@ -116,16 +117,16 @@ sequenceDiagram
     WF->>Act: update(status=UPLOADED)
     Act->>Mongo: save
     Act->>Kafka: publish "Content Uploaded"
-    par concurrently
-        WF->>Act: index(document)
-        Act->>Idx: extract, chunk, embed, index
-    and
-        WF->>Act: generateSummary(document)
-        Act->>Sum: extract text, ask Ollama for a summary
-    end
+    WF->>Act: index(document)
+    Act->>Idx: extract, chunk, embed, index, then force a refresh
     WF->>WF: status=INDEXED
-    WF->>Act: classifyDocument(document)
-    Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
+    par concurrently
+        WF->>Act: generateSummary(document)
+        Act->>Sum: ask Ollama for a summary, grounded in this document's own indexed chunks
+    and
+        WF->>Act: classifyDocument(document)
+        Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
+    end
     WF->>WF: merge summary into metadata
     WF->>Act: update(merged document)
     Act->>Mongo: save
@@ -143,10 +144,11 @@ Key design points:
   This means an abandoned or slow upload doesn't tie up a Temporal worker thread — only the brief
   moment of each poll does. The workflow gives up after 15 minutes (`MAX_UPLOAD_WAIT`) if content
   never arrives, and the document ends up `FAILED`.
-- **Indexing and summarization run concurrently** (`Async.function`), since both only need the
-  already-uploaded content. Classification, by contrast, is kicked off only once indexing
-  completes, since it queries the chunks indexing just wrote to the vector store rather than
-  re-reading raw content from MinIO — see [Document Classification](#document-classification).
+- **Summarization and classification both run only after indexing completes**, since both query
+  the chunks indexing just wrote to the vector store rather than re-reading raw content from
+  MinIO — see [Document Summarization & Classification](#document-summarization--classification).
+  They run concurrently with *each other*, but neither can start until indexing (and its
+  post-write refresh) has finished.
 - **A failed summary or classification never fails the document.** Both get their own activity
   stub with a 10-minute timeout and a single attempt (retrying a slow-but-correct LLM call wastes
   time for no benefit); if either throws, the workflow logs it and continues (classification falls
@@ -156,39 +158,78 @@ Key design points:
 - **Every step publishes a Kafka event** (`documents` topic) so external systems can observe
   ingestion progress without polling the API.
 
-## Document Classification
+## Document Summarization & Classification
 
-Once indexing completes, `DocumentClassificationServiceImpl` assigns `documentType` by asking
-`llama3.1` to pick exactly one of a fixed set of categories (`DocumentType`, in `docman-domain`):
-`statements`, `invoices`, `policy documents`, `compliance certificates`, `insurance documents`,
-`contracts` — or `unknown` if the document doesn't clearly match any of them (also the fallback if
-the model's response doesn't match a known label, or if the activity throws).
+Once indexing completes, two independent AI steps run concurrently, both grounded in the chunks
+indexing just wrote to the OpenSearch vector store rather than re-fetching the raw file from MinIO
+and re-running Tika a second time:
 
-Rather than re-fetching the raw file from MinIO and re-running Tika (which indexing already did),
-classification reuses the chunks indexing just wrote to the OpenSearch vector store: it runs a
-`QuestionAnswerAdvisor`-based RAG query scoped to this document alone, via a `parent_document_id`
-filter expression (the same metadata key `DocumentIndexService.deleteIndex` uses to clean up a
-document's chunks). This means classification only becomes possible after indexing — there's
-nothing to retrieve before that.
+- **`DocumentSummaryServiceImpl`** retrieves this document's own chunks (a `parent_document_id`
+  filter, the same metadata key `DocumentIndexService.deleteIndex` uses to clean them up, with a
+  generous `topK` so the filter — not similarity ranking — is what bounds the result set), sorts
+  them back into original reading order using their `chunk_index` metadata (vector search returns
+  chunks in similarity order, not document order), reassembles the text, and asks `llama3.1` for a
+  2-3 sentence summary. If no chunks come back (e.g. the file had no extractable text), it returns
+  `null` and the workflow skips the summary rather than storing a hallucinated one.
+- **`DocumentClassificationServiceImpl`** runs a `QuestionAnswerAdvisor`-based RAG query scoped the
+  same way, asking `llama3.1` to pick exactly one of a fixed set of categories (`DocumentType`, in
+  `docman-domain`): `statements`, `invoices`, `policy documents`, `compliance certificates`,
+  `insurance documents`, `contracts` — or `unknown` if the document doesn't clearly match any of
+  them (also the fallback if the model's response doesn't match a known label, or if the activity
+  throws). It runs at `temperature 0` (unlike the `1` used for RAG answers and summaries, configured
+  via `spring.ai.ollama.chat.options.temperature` in `application.yaml`) via a per-call
+  `OllamaChatOptions` override passed directly in code, so the same document consistently gets the
+  same category — a single-word classification otherwise drifts between similar categories (e.g.
+  "invoices" vs. "statements") on repeated runs of identical content at the app's configured
+  temperature of `1`.
 
-Classification runs at `temperature 0` via a per-call `OllamaChatOptions` override passed directly
-in code, so the same document consistently gets the same category — a single-word classification
-otherwise drifts between similar categories (e.g. "invoices" vs. "statements") on repeated runs of
-identical content at Ollama's non-zero default sampling temperature. (RAG answers and summaries
-don't set this override, so they run at whatever temperature Ollama itself defaults to — see the
-`spring.ai.ollama.chat.options.temperature` note in
-[`docs/SETUP.md`](SETUP.md#configuration-reference) for a config quirk affecting that value.)
+**Both depend on indexing's post-write refresh.** OpenSearch's default near-real-time refresh means
+newly-added chunks aren't guaranteed searchable the instant `vectorStore.add()` returns — there can
+be up to a second (or more, under load) before a background refresh cycle makes them visible.
+Since both AI steps above query for this document's chunks immediately after indexing completes,
+`DocumentIndexServiceImpl.index()` explicitly calls `openSearchClient.indices().refresh(...)`
+itself right after adding the chunks, so by the time indexing's activity returns (and the workflow
+kicks off summarization/classification), those chunks are guaranteed queryable — closing what would
+otherwise be an intermittent race (summary/classification silently seeing zero chunks depending on
+system timing).
 
 Once a category is decided, the workflow persists `documentType` on the `Document` record and
 publishes a `Document Classified: {documentType}` Kafka event — separate from the `Document
-Indexed` event, since classification finishes after indexing's own Mongo write.
+Indexed` event, since classification finishes independently of the summary merge.
 
-**Known limitation**: classification updates the Mongo `Document` record, but does *not* retroactively
-update the `documentType` already written into the vector store's chunk metadata (indexing runs
-*before* classification, so it can only capture whatever `documentType` the caller supplied at
-creation — usually nothing). This means `POST /document/search` filtering by `documentType` matches
-the caller-supplied value at upload time, not the AI-assigned one; `GET /document/metadata/{id}` is
-the source of truth for the classified type.
+Persisting `documentType` (like every other `DocumentService.update()` call) also triggers the
+vector store metadata sync described below, so the chunk metadata written at indexing time — which
+predates both the summary and the classification result — ends up reflecting them shortly after.
+
+## Keeping Vector Store Metadata in Sync
+
+Indexing captures `metadata`/`documentType` once, at indexing time. Everything that changes a
+`Document` afterward — the summary and classification merges above, or any future direct metadata
+edit — goes through the single `DocumentServiceImpl.update()` method, which now publishes the
+document's id to the `document-metadata-sync` Kafka topic right after saving to Mongo.
+`DocumentIndexSyncConsumer` (`docman-api`) consumes that topic, re-fetches the current `DocumentDto`
+(rather than trusting the message payload, which could be stale by the time it's processed), and
+calls `DocumentIndexService.updateMetadata()`, which runs an OpenSearch `update_by_query` scoped to
+this document's chunks (the same `parent_document_id` filter used elsewhere) with a small Painless
+script that merges each key from the current Mongo `metadata`/`documentType` into the chunk's
+existing `metadata` object — key-by-key, not a wholesale replace, so chunk-only fields
+(`parent_document_id`, `chunk_index`, `total_chunks`) survive untouched. The request sets
+`refresh: true` directly, so the change is searchable immediately, without a separate refresh call.
+
+This is deliberately a metadata-only patch, not a reindex: it never touches `embedding` or
+`content`, so it doesn't re-run Tika, MinIO, or the embedding model. A few consequences worth
+knowing:
+
+- It's a **merge, not a diff** — removing a key from the Mongo `metadata` map doesn't remove it from
+  the chunk (only additions/overwrites propagate). Full deletion-aware sync would need to compare
+  old vs. new metadata, which isn't implemented.
+- It's **eventually consistent, not synchronous** — `POST /document/search` may briefly still return
+  the pre-update value for a `documentType`/metadata filter until the Kafka message is consumed
+  (typically milliseconds to a couple of seconds locally). `GET /document/metadata/{id}` (reading
+  straight from Mongo) is always current.
+- It runs on **every** `update()` call, including the very first one (`UPLOADED` status, before
+  indexing has written anything) — `update_by_query` simply matches zero chunks in that case, which
+  is a harmless no-op logged at `info` level (`Synced metadata into 0 indexed chunk(s)...`).
 
 ## Search & RAG
 
@@ -209,9 +250,8 @@ Two independent search paths exist over the same OpenSearch index (`docman-vecto
 
 Each indexed chunk's metadata includes the caller-supplied `metadata` map, plus two fields the
 system adds automatically: `parent_document_id` (used to collapse/dedupe multiple chunks from the
-same document in search results) and, when set at creation time, `documentType` — see the [known
-limitation](#document-classification) above for why this is the caller-supplied value, not the
-later AI-classified one.
+same document in search results) and `documentType`, kept up to date by the [vector store metadata
+sync](#keeping-vector-store-metadata-in-sync) described above.
 
 ## Presigned URLs
 

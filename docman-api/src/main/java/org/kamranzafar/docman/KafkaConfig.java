@@ -44,6 +44,8 @@ public class KafkaConfig {
     private String groupId;
     @Value(value = "${kafka.topic}")
     private String topic;
+    @Value(value = "${kafka.metadata-sync-topic}")
+    private String metadataSyncTopic;
     @Value(value = "${kafka.message-retention:86400000}")
     private String messageRetention;
 
@@ -60,6 +62,15 @@ public class KafkaConfig {
                 .partitions(1)
                 .replicas(1)
                 .config(TopicConfig.RETENTION_MS_CONFIG, messageRetention) // 24 hours
+                .build();
+    }
+
+    @Bean
+    public NewTopic documentMetadataSyncTopic() {
+        return TopicBuilder.name(metadataSyncTopic)
+                .partitions(1)
+                .replicas(1)
+                .config(TopicConfig.RETENTION_MS_CONFIG, messageRetention)
                 .build();
     }
 
