@@ -15,18 +15,20 @@ without blocking the client that uploaded the document.
 - **Asynchronous ingestion workflow** (Temporal) that waits for the upload to land, extracts text
   with Apache Tika, chunks and embeds it, and indexes it — with automatic retries and a durable,
   thread-cheap wait for slow or delayed uploads
-- **Concurrent AI summarization**: an Ollama (`llama3.1`) call generates a short summary of every
-  ingested document in parallel with indexing, saved back onto the document's metadata; a failed
-  or slow summary never blocks the document from being marked as indexed
-- **AI document classification**: once indexing completes, a RAG query over the document's own
-  indexed chunks assigns `documentType` — one of `statements`, `invoices`, `policy documents`,
-  `compliance certificates`, `insurance documents`, `contracts`, or `unknown` — and publishes a
-  Kafka event once done; like summarization, a failed or slow classification never blocks the
-  document from reaching `INDEXED`
+- **AI summarization and classification**: once indexing completes, two RAG queries over the
+  document's own indexed chunks run concurrently with each other — one generates a short summary,
+  the other assigns `documentType` (one of `statements`, `invoices`, `policy documents`,
+  `compliance certificates`, `insurance documents`, `contracts`, or `unknown`) — each publishing a
+  Kafka event once done; a failed or slow summary/classification never blocks the document from
+  reaching `INDEXED`
 - **Vector search / RAG**: ask natural-language questions and get answers grounded in the indexed
   document content (`nomic-embed-text` embeddings, OpenSearch as the vector store, `llama3.1` chat)
 - **Structured metadata search**: filter documents by arbitrary metadata fields (including document
   type and free-form tags) without needing to know OpenSearch's query syntax
+- **Kafka-triggered vector store metadata sync**: every document metadata update (summary results,
+  classification, or future direct edits) publishes to a Kafka topic that a consumer picks up to
+  patch the corresponding OpenSearch chunks' metadata in place — no re-embedding, no re-reading the
+  file
 - **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
   down the MinIO object, the vector store entries, the Mongo record, and cancels any still-running
   ingestion workflow for that document)

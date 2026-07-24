@@ -12,6 +12,7 @@ kafka:
   address: localhost:9092
   groupId: docman
   topic: documents
+  metadata-sync-topic: document-metadata-sync
   message-retention: 86400000
 spring:
   main:
@@ -50,7 +51,6 @@ spring:
           model: nomic-embed-text
       chat:
         model: llama3.1
-        temperature: 1
-        max-file-size: -1
         options:
           timeout: 600s
+          temperature: 1

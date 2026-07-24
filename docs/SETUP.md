@@ -141,10 +141,11 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `spring.ai.ollama.embedding.options.model`                               | `nomic-embed-text`                | Embedding model |
 | `spring.ai.ollama.chat.model`                                               | `llama3.1`                        | Chat model, used for RAG answers, summarization, and classification |
 | `spring.ai.ollama.chat.options.timeout`                                       | `600s`                            | Max time for a single Ollama chat call |
-| `spring.ai.ollama.chat.options.temperature`                                     | *(unset)*                         | Sampling temperature for RAG answers and summaries — falls through to Ollama's own server-side default when unset. **Note**: `application.yaml` currently has a `temperature: 1` key as a sibling of `chat.options` rather than nested inside it, which `OllamaChatProperties` doesn't bind (it only recognizes `model` and `options`), so that line is a no-op today. Document classification is unaffected either way — it sets `temperature 0` directly per-call in code (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-classification)), not via this property |
+| `spring.ai.ollama.chat.options.temperature`                                     | `1`                               | Default sampling temperature for RAG answers and summaries. Document classification overrides this to `0` per-call in code regardless (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) |
 | `spring.servlet.multipart.max-file-size` / `.max-request-size`                  | `100MB`                           | Direct (`PUT /document`) upload size cap |
 | `kafka.address`                                                                    | `localhost:9092`                  | Kafka bootstrap server |
 | `kafka.topic`                                                                        | `documents`                       | Lifecycle notification topic |
+| `kafka.metadata-sync-topic`                                                            | `document-metadata-sync`          | Trigger topic for syncing vector store chunk metadata on every `DocumentService.update()` (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) |
 
 ## Deployment notes
 

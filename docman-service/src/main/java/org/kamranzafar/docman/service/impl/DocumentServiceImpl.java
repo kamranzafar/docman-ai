@@ -28,6 +28,8 @@ import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.repository.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +40,15 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
+    @Value(value = "${kafka.metadata-sync-topic}")
+    private String metadataSyncTopic;
+
     @Autowired
     private DocumentMetadataRepository documentMetadataRepository;
     @Autowired
     private DocumentMapper documentMapper;
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     @Transactional
     @Override
@@ -63,7 +70,14 @@ public class DocumentServiceImpl implements DocumentService {
         log.info("Updating a document with id {}", documentDto.getId());
         Document document = documentMapper.toEntity(documentDto);
         String status = document.getStatus() != null ? document.getStatus() : DocumentStatus.UPDATED.name();
-        return documentMapper.toDto(saveDocument(document, status));
+        Document saved = saveDocument(document, status);
+
+        // Triggers an async metadata-only sync into the vector store's already-indexed
+        // chunks (see DocumentIndexSyncConsumer), so summary/classification results and
+        // any other metadata change are reflected there without a full reindex.
+        kafkaTemplate.send(metadataSyncTopic, saved.getId().toString());
+
+        return documentMapper.toDto(saved);
     }
 
     @NotNull
