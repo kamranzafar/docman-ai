@@ -101,20 +101,18 @@ Or run the built jar directly:
 java -jar docman-api/target/docman-api-1.0-SNAPSHOT.jar
 ```
 
-The `spring-boot-maven-plugin` config passes two JVM system properties sourced from environment
-variables — `SSL_KEYSTORE` and `SSL_KEYSTORE_PASS` — used as the Java trust store for the OpenSearch
-TLS connection (OpenSearch's Docker image uses a self-signed certificate by default). If you're
-running the jar directly rather than via `spring-boot:run`, set these yourself:
+No manual TLS setup is needed for OpenSearch: its Docker image ships with a fixed, well-known
+self-signed demo certificate (the same across every pull of the image, not regenerated per
+container), signed by a root CA whose public certificate is checked into this repo
+(`docman-api/src/main/resources/opensearch-root-ca.pem`) and wired in as a Spring Boot SSL bundle
+(`spring.ssl.bundle.pem.opensearch`, referenced by `spring.ai.vectorstore.opensearch.ssl-bundle` in
+`application.yaml`). This is scoped to just the OpenSearch connection — it doesn't touch the JVM's
+default trust store — and works out of the box against the bundled `docker-compose.yml` setup with
+no environment variables or `keytool` steps required.
 
-```shell
-java -Djavax.net.ssl.trustStore=$SSL_KEYSTORE \
-     -Djavax.net.ssl.trustStorePassword=$SSL_KEYSTORE_PASS \
-     -jar docman-api/target/docman-api-1.0-SNAPSHOT.jar
-```
-
-Your trust store needs to trust OpenSearch's certificate; import it if you haven't already
-(consult your JDK's `keytool` documentation, or point `SSL_KEYSTORE` at a store that already trusts
-it).
+If you point this app at a *different* OpenSearch instance with its own (non-demo) certificate,
+replace `opensearch-root-ca.pem` with that instance's CA certificate, or remove the `ssl-bundle`
+property to fall back to the JVM's default trust store (and configure that trust store yourself).
 
 Verify the app is up:
 
@@ -172,9 +170,13 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 - **Port 8088 already in use on startup**: the bundled `docman-temporal` container also publishes
   host port 8088. Run the app on a different port: `mvn -pl docman-api -am spring-boot:run
   -Dspring-boot.run.arguments=--server.port=8090` (or `java -jar ... --server.port=8090`).
-- **`PKIX path building failed` / SSL handshake errors talking to OpenSearch**: your JVM's trust
-  store doesn't trust OpenSearch's self-signed certificate. Make sure `SSL_KEYSTORE` /
-  `SSL_KEYSTORE_PASS` point at a trust store that has it imported (see step 4 above).
+- **`PKIX path building failed` / SSL handshake errors talking to OpenSearch**: this shouldn't
+  happen against the bundled `docker-compose.yml` OpenSearch (see step 4 above — trust is
+  automatic via a checked-in SSL bundle). If you hit it anyway, confirm
+  `docman-api/src/main/resources/opensearch-root-ca.pem` is actually on the runtime classpath, and
+  that `spring.ai.vectorstore.opensearch.ssl-bundle: opensearch` in `application.yaml` hasn't been
+  removed/overridden. If you've pointed the app at a different OpenSearch instance with its own
+  certificate, you'll need to swap in that instance's CA certificate instead.
 - **`/document/ask` or summary generation seems to hang**: Ollama chat calls on CPU-only hardware
   can legitimately take minutes. Check `ollama ps` to confirm the model is loaded and actively
   processing (100% CPU) rather than stuck.
