@@ -117,7 +117,7 @@ property to fall back to the JVM's default trust store (and configure that trust
 Verify the app is up:
 
 ```shell
-curl -s http://localhost:8088/actuator/health
+curl -s http://localhost:8081/actuator/health
 ```
 
 ## Configuration reference

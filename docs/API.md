@@ -1,6 +1,6 @@
 # API Reference
 
-Base URL: `http://localhost:8088` (default; see [`docs/SETUP.md`](SETUP.md#configuration-reference)
+Base URL: `http://localhost:8081` (default; see [`docs/SETUP.md`](SETUP.md#configuration-reference)
 for how the port is configured). All endpoints are under `/api/v1/document`. There is no authentication —
 this is a reference implementation.
 
@@ -113,7 +113,7 @@ curl -X PUT "<url>" --data-binary @invoice-123.pdf
 ```
 
 ```shell
-curl -X POST http://localhost:8088/api/v1/document \
+curl -X POST http://localhost:8081/api/v1/document \
   -H "Content-Type: application/json" \
   -d '{"name":"invoice-123.pdf","contentType":"application/pdf","documentType":"invoice","metadata":{"vendor":"acme"}}'
 ```
@@ -141,7 +141,7 @@ Note: `documentType` cannot be supplied via this endpoint (only via `POST /api/v
 the workflow (already having its content) proceeds straight through without waiting.
 
 ```shell
-curl -X PUT http://localhost:8088/api/v1/document \
+curl -X PUT http://localhost:8081/api/v1/document \
   -F "file=@invoice-123.pdf;type=application/pdf" \
   -F 'metadata={"vendor":"acme"};type=application/json' \
   -F "createdBy=alice"
@@ -195,7 +195,7 @@ this update lost a concurrency race against another update to the same document 
 retry.
 
 ```shell
-curl -X POST http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X POST http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -H "Content-Type: application/json" \
   -d '{"name":"invoice-123-corrected.pdf","contentType":"application/pdf","metadata":{"vendor":"acme"},"updatedBy":"bob"}'
 ```
@@ -234,7 +234,7 @@ retry.
 Metadata-only:
 
 ```shell
-curl -X PUT http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X PUT http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -F 'metadata={"metadata":{"vendor":"acme","region":"us"},"updatedBy":"bob"};type=application/json'
 ```
 
@@ -242,7 +242,7 @@ Metadata + a new file (bumps `version`, resets `status` to `CREATED`, and starts
 run):
 
 ```shell
-curl -X PUT http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
+curl -X PUT http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a \
   -F 'metadata={"metadata":{"vendor":"acme"},"updatedBy":"bob"};type=application/json' \
   -F "file=@invoice-123-corrected.pdf;type=application/pdf"
 ```
@@ -266,9 +266,9 @@ snapshot's `status` is always `null` — it's not a live-workflow concept.
 exist), `400` if the id isn't a valid UUID.
 
 ```shell
-curl "http://localhost:8088/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8081/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 # a specific past version:
-curl "http://localhost:8088/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
+curl "http://localhost:8081/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
 ```
 
 ---
@@ -292,11 +292,11 @@ itself first and returns its own `404` if that version never had a file uploaded
 metadata-only revision) — the latest-version path doesn't do this extra check.
 
 ```shell
-curl "http://localhost:8088/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl "http://localhost:8081/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 # then:
 curl "<returned url>" -o invoice-123.pdf
 # a specific past version:
-curl "http://localhost:8088/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
+curl "http://localhost:8081/api/v1/document/content/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/1"
 ```
 
 ---
@@ -328,7 +328,7 @@ timeout message.
 **Errors**: `400` if `question` is blank/missing.
 
 ```shell
-curl -X POST http://localhost:8088/api/v1/document/ask \
+curl -X POST http://localhost:8081/api/v1/document/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What does the invoice from acme cover?"}'
 ```
@@ -376,7 +376,7 @@ by parent document where possible):
 nothing matches.
 
 ```shell
-curl -X POST http://localhost:8088/api/v1/document/search \
+curl -X POST http://localhost:8081/api/v1/document/search \
   -H "Content-Type: application/json" \
   -d '{"filters":{"documentType":"invoice"}}'
 ```
@@ -401,7 +401,7 @@ whose workflow already finished, or whose content was never uploaded, is handled
 are no-ops for the respective cleanup step, not errors).
 
 ```shell
-curl -X DELETE "http://localhost:8088/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
 ```
 
 ---
