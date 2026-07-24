@@ -1,0 +1,27 @@
+meta {
+  name: Delete Document
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Run this last - afterward `{{documentId}}` no longer resolves to anything (see
+  "Get Metadata - Latest" in `03 - Retrieve`, which should now 404).
+}

@@ -1,0 +1,63 @@
+meta {
+  name: Presigned Upload (POST)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "invoice-presigned.txt",
+    "contentType": "text/plain",
+    "documentType": "invoice",
+    "metadata": {
+      "vendor": "acme"
+    },
+    "createdBy": "alice"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+script:post-response {
+  if (res.body && res.body.document) {
+    bru.setVar("presignedDocumentId", res.body.document.id);
+    bru.setVar("presignedUploadUrl", res.body.url);
+  }
+}
+
+tests {
+  test("returns 200 with a presigned PUT url and status CREATED", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.url).to.include("X-Amz-Signature");
+    expect(res.body.document.status).to.equal("CREATED");
+    expect(res.body.document.version).to.equal(1);
+  });
+}
+
+docs {
+  Async create: only metadata is written here: `url` in the response is a presigned MinIO
+  PUT URL. The ingestion workflow polls MinIO every 5s and only starts processing once
+  content actually lands there - until then the document stays in `CREATED`.
+
+  Copy `{{presignedUploadUrl}}` into a plain PUT request (any HTTP client, not this
+  collection - it's a raw MinIO URL, not a `{{baseUrl}}` one) with the file bytes as the
+  body to complete the upload, e.g.:
+
+    curl -X PUT "<presignedUploadUrl>" --data-binary @documents/invoice.txt
+
+  `documentType` here ("invoice") is just the caller's optional initial tag - AI
+  classification overwrites it once ingestion completes.
+}

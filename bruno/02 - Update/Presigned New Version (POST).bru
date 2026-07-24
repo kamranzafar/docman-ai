@@ -1,0 +1,54 @@
+meta {
+  name: Presigned New Version (POST)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "invoice-v3-presigned.txt",
+    "contentType": "text/plain",
+    "metadata": { "vendor": "acme-updated", "region": "us" },
+    "updatedBy": "carol"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+script:post-response {
+  if (res.body && res.body.document) {
+    bru.setVar("documentVersion", res.body.document.version);
+  }
+}
+
+tests {
+  test("returns a presigned url for the new version and bumps version", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.url).to.include("X-Amz-Signature");
+    expect(res.body.document.status).to.equal("CREATED");
+    expect(res.body.document.updatedBy).to.equal("carol");
+  });
+}
+
+docs {
+  Mirrors "Presigned Upload (POST)" in `01 - Create` but for an existing document: returns
+  a presigned MinIO PUT URL keyed at `{{documentId}}/{new-version}/invoice-v3-presigned.txt`.
+  The previous version's vector chunks are deleted immediately (before upload even
+  happens), same reasoning as the direct file-update case.
+
+  Upload with, e.g.:
+    curl -X PUT "<url from response>" --data-binary @documents/invoice-v2.txt
+}

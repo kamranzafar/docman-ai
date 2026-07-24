@@ -1,0 +1,32 @@
+meta {
+  name: Document Not Found (404)
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document/00000000-0000-0000-0000-000000000000
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  metadata: @file(../payloads/update-metadata-only.json)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 404 for a well-formed but nonexistent document id", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.body.detail).to.equal("Document not found");
+  });
+}
+
+docs {
+  A syntactically valid UUID that doesn't correspond to any document. The presigned update
+  endpoint (`POST /document/{id}`) behaves identically for an unknown id.
+}

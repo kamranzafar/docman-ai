@@ -140,7 +140,7 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `spring.ai.ollama.chat.model`                                               | `llama3.1`                        | Chat model, used for RAG answers, summarization, and classification |
 | `spring.ai.ollama.chat.options.timeout`                                       | `600s`                            | Max time for a single Ollama chat call |
 | `spring.ai.ollama.chat.options.temperature`                                     | `1`                               | Default sampling temperature for RAG answers and summaries. Document classification overrides this to `0` per-call in code regardless (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) |
-| `spring.servlet.multipart.max-file-size` / `.max-request-size`                  | `100MB`                           | Direct (`PUT /document`) upload size cap |
+| `spring.servlet.multipart.max-file-size` / `.max-request-size`                  | `100MB`                           | Direct (`PUT /api/v1/document`) upload size cap |
 | `kafka.address`                                                                    | `localhost:9092`                  | Kafka bootstrap server |
 | `kafka.topic`                                                                        | `documents`                       | Lifecycle notification topic |
 | `kafka.metadata-sync-topic`                                                            | `document-metadata-sync`          | Trigger topic for syncing vector store chunk metadata on every `DocumentService.update()` (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) |
@@ -177,10 +177,10 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
   that `spring.ai.vectorstore.opensearch.ssl-bundle: opensearch` in `application.yaml` hasn't been
   removed/overridden. If you've pointed the app at a different OpenSearch instance with its own
   certificate, you'll need to swap in that instance's CA certificate instead.
-- **`/document/ask` or summary generation seems to hang**: Ollama chat calls on CPU-only hardware
+- **`/api/v1/document/ask` or summary generation seems to hang**: Ollama chat calls on CPU-only hardware
   can legitimately take minutes. Check `ollama ps` to confirm the model is loaded and actively
   processing (100% CPU) rather than stuck.
-- **A document never leaves `CREATED`**: for the presigned-URL flow (`POST /document`), the
+- **A document never leaves `CREATED`**: for the presigned-URL flow (`POST /api/v1/document`), the
   workflow is waiting for content to actually land in MinIO — confirm the client actually performed
   the `PUT` to the returned presigned URL. The workflow gives up after 15 minutes and marks the
   document `FAILED`.

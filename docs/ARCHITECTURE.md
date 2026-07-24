@@ -78,13 +78,13 @@ A `Document` moves through these statuses (`DocumentStatus`):
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CREATED: POST/PUT /document
+    [*] --> CREATED: POST/PUT /api/v1/document
     CREATED --> UPLOADED: content lands in MinIO
     UPLOADED --> INDEXED: text extracted, embedded, and summarized
     CREATED --> FAILED: upload never arrives, or indexing fails
     UPLOADED --> FAILED: indexing fails
-    INDEXED --> [*]: DELETE /document
-    FAILED --> [*]: DELETE /document
+    INDEXED --> [*]: DELETE /api/v1/document
+    FAILED --> [*]: DELETE /api/v1/document
 ```
 
 `UPDATED` also exists on the enum as a generic "metadata was updated" status, used by the shared
@@ -92,7 +92,7 @@ stateDiagram-v2
 
 `status` and `version` are independent axes: `status` tracks where the *current* version is in
 the ingestion pipeline; `version` is a monotonically increasing counter that only moves on
-user-driven changes (a new file, or a metadata update via `PUT /document/{id}`) — see
+user-driven changes (a new file, or a metadata update via `PUT /api/v1/document/{id}`) — see
 [Document Versioning & Revision History](#document-versioning--revision-history). A new file
 version resets `status` back to `CREATED` and re-enters this same state machine.
 
@@ -100,7 +100,7 @@ version resets `status` back to `CREATED` and re-enters this same state machine.
 
 `DocumentWorkflowManager.createWorkflow` starts one `DocumentWorkflow` execution per document
 **version**, using a **deterministic workflow ID** (`doc-wf-{documentId}-v{version}`) — this lets
-`DELETE /document/{id}` look up and terminate the current version's workflow without needing to
+`DELETE /api/v1/document/{id}` look up and terminate the current version's workflow without needing to
 store the workflow ID anywhere, and lets a new file version start its own independent execution
 (under a new ID) rather than depending on the previous version's run having already closed.
 
@@ -168,7 +168,7 @@ Key design points:
 
 Every `Document` carries `createdAt`/`createdBy` (set once, at creation) and
 `updatedAt`/`updatedBy` (touched only by user-driven changes) alongside a `version` counter that
-starts at `1` and increments exactly when a `POST`/`PUT /document/{id}` update includes a new
+starts at `1` and increments exactly when a `POST`/`PUT /api/v1/document/{id}` update includes a new
 file, or changes metadata/documentType without one. Internal system saves — the workflow's own
 status transitions, summary merge, and classification merge, all still going through the original
 `DocumentService.update(DocumentDto)` — deliberately leave `version`/`updatedAt`/`updatedBy`
@@ -179,13 +179,13 @@ Every version bump (`DocumentServiceImpl.updateDocument`) also writes a `Documen
 snapshot to the `document_revisions` collection — `documentId`, `version`, `name`, `contentType`,
 `documentType`, `metadata`, `updatedAt`, `updatedBy`, and whether this version included a new
 file. `create()` writes a version-1 revision too, so history is complete from the start.
-`GET /document/metadata/{id}/{version}` reads directly from this collection instead of the live
+`GET /api/v1/document/metadata/{id}/{version}` reads directly from this collection instead of the live
 `Document` (a revision has no `status` — that's a live-workflow concept, not part of a version
 snapshot).
 
-Updates come in the same two flavors as creation does, mirroring `POST`/`PUT /document`:
+Updates come in the same two flavors as creation does, mirroring `POST`/`PUT /api/v1/document`:
 
-- **`PUT /document/{id}`** (multipart: a `metadata` part shaped like `DocumentUpdateRequest`, plus
+- **`PUT /api/v1/document/{id}`** (multipart: a `metadata` part shaped like `DocumentUpdateRequest`, plus
   an optional `file` part) handles both cases directly:
   - **Metadata-only** (`documentType`/`metadata`/`updatedBy`, no file): bumps `version`, replaces
     the metadata map outright rather than merging it (an update that omits a key drops it,
@@ -202,14 +202,14 @@ Updates come in the same two flavors as creation does, mirroring `POST`/`PUT /do
     deliberately skipped for this case: syncing now would be redundant (the new version's own
     indexing is about to write fresh metadata anyway), and testing showed it can race the
     concurrent `deleteIndex` call and fail with an OpenSearch version conflict on the same chunk.
-- **`POST /document/{id}`** is the presigned-upload counterpart, for when a new file version is
+- **`POST /api/v1/document/{id}`** is the presigned-upload counterpart, for when a new file version is
   intended but the caller wants to upload it directly to MinIO rather than through this API (large
   files, browser clients, etc.) — same version bump, metadata replacement, `deleteIndex` cleanup,
   and new workflow execution as the file case above, but it returns a presigned **PUT** URL instead
   of accepting the bytes, and the new workflow's upload-wait step picks up the content once the
-  client uploads it (exactly like `POST /document` on creation). Since the presigned URL needs the
+  client uploads it (exactly like `POST /api/v1/document` on creation). Since the presigned URL needs the
   new object key upfront, this endpoint always requires `name`/`contentType` in the request body —
-  unlike `PUT /document/{id}`, it has no metadata-only mode.
+  unlike `PUT /api/v1/document/{id}`, it has no metadata-only mode.
 
 **Concurrency guard**: `updateDocument` uses an optimistic-concurrency compare-and-swap rather
 than a plain read-modify-write. It reads the current `Document`, then applies the change via
@@ -227,11 +227,11 @@ on the same field, applied only in this one code path.
 
 MinIO objects are stored per version — `{documentId}/{version}/{name}` — so every version's file
 remains independently retrievable; `ObjectStoreServiceImpl` builds this key from
-`DocumentDto.getVersion()` for every operation. A full `DELETE /document/{id}` removes every
+`DocumentDto.getVersion()` for every operation. A full `DELETE /api/v1/document/{id}` removes every
 version's object (a MinIO prefix list + bulk delete under `{documentId}/`), not just the current
 one, along with all of that document's `DocumentRevision`s.
 
-`GET /document/metadata/{id}` and `GET /document/content/{id}` both accept an optional trailing
+`GET /api/v1/document/metadata/{id}` and `GET /api/v1/document/content/{id}` both accept an optional trailing
 `/{version}` segment to look up a specific past version instead of the latest. A content lookup
 for a specific version also checks MinIO object existence first and 404s if that version never
 had a file uploaded (e.g. a metadata-only revision) — the "latest" path doesn't do this extra
@@ -308,9 +308,9 @@ knowing:
 - It's a **merge, not a diff** — removing a key from the Mongo `metadata` map doesn't remove it from
   the chunk (only additions/overwrites propagate). Full deletion-aware sync would need to compare
   old vs. new metadata, which isn't implemented.
-- It's **eventually consistent, not synchronous** — `POST /document/search` may briefly still return
+- It's **eventually consistent, not synchronous** — `POST /api/v1/document/search` may briefly still return
   the pre-update value for a `documentType`/metadata filter until the Kafka message is consumed
-  (typically milliseconds to a couple of seconds locally). `GET /document/metadata/{id}` (reading
+  (typically milliseconds to a couple of seconds locally). `GET /api/v1/document/metadata/{id}` (reading
   straight from Mongo) is always current.
 - It runs on **every** `update()` call, including the very first one (`UPLOADED` status, before
   indexing has written anything) — `update_by_query` simply matches zero chunks in that case, which
@@ -320,13 +320,13 @@ knowing:
 
 Two independent search paths exist over the same OpenSearch index (`docman-vector-index`):
 
-- **`POST /document/ask`** — vector similarity search + RAG. The question is embedded, the most
+- **`POST /api/v1/document/ask`** — vector similarity search + RAG. The question is embedded, the most
   relevant chunks are retrieved from OpenSearch, and `llama3.1` generates an answer grounded in
   that context (`QuestionAnswerAdvisor`). Runs on a bounded background executor
   (`askExecutor`, separate from Tomcat's request threads) since Ollama inference can take minutes
   on CPU-only hardware — the HTTP request uses Spring MVC's `DeferredResult` so the calling thread
   isn't blocked for the duration.
-- **`POST /document/search`** — structured metadata search. Callers supply a map of field → value
+- **`POST /api/v1/document/search`** — structured metadata search. Callers supply a map of field → value
   filters (e.g. `{"documentType": "invoice"}`); the server builds an OpenSearch `bool`/`match`
   query, prefixing every key with `metadata.` server-side. This means callers can never reach
   fields outside the `metadata` subtree (like raw `content` or the `embedding` vector) no matter
@@ -340,15 +340,15 @@ sync](#keeping-vector-store-metadata-in-sync) described above.
 
 ## Presigned URLs
 
-`POST /document` returns a MinIO presigned **PUT** URL — the client uploads content directly to
+`POST /api/v1/document` returns a MinIO presigned **PUT** URL — the client uploads content directly to
 object storage, and the workflow's upload-wait step picks it up once it lands. `POST
-/document/{id}` does the same for a new version of an existing document. `GET
-/document/content` returns a presigned **GET** URL for downloading. All are genuinely
+/api/v1/document/{id}` does the same for a new version of an existing document. `GET
+/api/v1/document/content` returns a presigned **GET** URL for downloading. All are genuinely
 method-locked (the signature only validates for its intended HTTP method) and expire independently
 (`minio.presigned.upload-url-expiry` / `download-url-expiry`, see
 [`docs/SETUP.md`](SETUP.md#configuration-reference)).
 
-`PUT /document` is the alternative, synchronous path: the client sends the file directly in the
+`PUT /api/v1/document` is the alternative, synchronous path: the client sends the file directly in the
 request body (multipart), and the server streams it straight to MinIO without buffering the whole
 file in memory.
 

@@ -1,0 +1,28 @@
+CERTIFICATE OF COMPLIANCE
+
+Certificate Number: COC-2026-8841
+Issuing Body: International Standards Compliance Board (ISCB)
+
+This is to certify that:
+
+    Widget Supplies Inc.
+    456 Vendor Ave, Metropolis, USA
+
+has been assessed and found to comply with the requirements of:
+
+    ISO 9001:2015 - Quality Management Systems
+
+Scope of Certification:
+Design, manufacture, and distribution of industrial widgets and related components.
+
+Certificate Issued: 2026-03-01
+Certificate Valid Until: 2029-02-28
+Audit Reference: AUD-2026-0456
+
+This certificate remains valid provided the organization maintains its quality
+management system in accordance with the requirements of the above standard, subject
+to continued satisfactory operation of the organization's quality management system
+and to periodic surveillance audits.
+
+Authorized Signatory: Dr. Helena Marsh, Lead Auditor
+International Standards Compliance Board

@@ -1,0 +1,38 @@
+meta {
+  name: Metadata Only (PUT)
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  metadata: @file(../payloads/update-metadata-only.json)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("bumps version without touching the file", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.document.version).to.equal(2);
+    expect(res.body.document.updatedBy).to.equal("bob");
+    expect(res.body.document.metadata.vendor).to.equal("acme-updated");
+  });
+}
+
+docs {
+  No `file` part is sent, so `documentService.updateDocument` bumps the version and
+  records a revision, but no re-indexing/workflow run happens - `status` stays whatever it
+  already was (should be `INDEXED` if the create request finished processing first).
+
+  Run "Direct Upload (PUT)" in `01 - Create` first so `{{documentId}}` points at a fresh
+  version-1 document.
+}

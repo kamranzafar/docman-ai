@@ -1,0 +1,30 @@
+INVOICE (REVISED)
+
+Invoice Number: INV-2026-00123-R1
+Invoice Date: 2026-07-10
+Due Date: 2026-08-09
+
+Bill To:
+Acme Corporation
+123 Business Rd
+Springfield, USA
+
+From:
+Widget Supplies Inc.
+456 Vendor Ave
+Metropolis, USA
+
+Description                     Quantity   Unit Price   Total
+-----------------------------------------------------------
+Widget A                        20         $25.00       $500.00
+Widget C                        3          $60.00       $180.00
+Shipping and Handling           1          $45.00       $45.00
+
+Subtotal:                                              $725.00
+Tax (8%):                                              $58.00
+Total Due:                                             $783.00
+
+Payment Terms: Net 30
+This revised invoice supersedes INV-2026-00123 due to a quantity correction.
+
+Thank you for your business!

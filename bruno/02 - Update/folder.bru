@@ -1,0 +1,20 @@
+meta {
+  name: 02 - Update
+  seq: 2
+}
+
+docs {
+  Update paths for an existing document, created by `01 - Create`. Every request here
+  targets `{{documentId}}` (set by "Direct Upload (PUT)" in `01 - Create`) - run that
+  request first, or manually set `documentId`/`documentVersion` collection variables to an
+  existing document's id/version.
+
+  Two independent axes:
+  - Metadata-only update vs. metadata + new file (the latter bumps back through the full
+    ingestion workflow: `CREATED -> UPLOADED -> INDEXED` plus re-classification/summary).
+  - Direct (`PUT`, file bytes in the request) vs. presigned (`POST`, returns a MinIO PUT
+    URL for the client to upload to separately) - mirrors the same two shapes as create.
+
+  `DocumentUpdateRequest` metadata **replaces** the existing metadata map; it does not
+  merge with it.
+}

@@ -42,7 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 
 @RestController
-@RequestMapping("/document")
+@RequestMapping("/api/v1/document")
 public class DocumentController {
     private static final long ASK_TIMEOUT_MS = 650_000;
 

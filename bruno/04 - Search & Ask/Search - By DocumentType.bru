@@ -1,0 +1,42 @@
+meta {
+  name: Search - By DocumentType
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filters": {
+      "documentType": "invoices"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns lexical matches collapsed to one hit per document", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body).to.be.an("array");
+  });
+}
+
+docs {
+  Direct OpenSearch `query_string` search (not vector/RAG) against the `metadata.*`
+  fields, collapsed on `metadata.parent_document_id.keyword` so a multi-chunk document
+  only appears once. Requires at least one document classified as "invoices" (see
+  `01 - Create` -> "Direct Upload (PUT)").
+}

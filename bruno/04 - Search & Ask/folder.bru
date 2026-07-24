@@ -1,0 +1,14 @@
+meta {
+  name: 04 - Search & Ask
+  seq: 4
+}
+
+docs {
+  `/document/ask` (RAG via Ollama + vector store) and `/document/search` (lexical OpenSearch
+  query against document metadata). These operate collection-wide, not against a single
+  `{{documentId}}` - run a few documents from `01 - Create` through to `INDEXED` first so
+  there's something to find.
+
+  `ask` responses depend on an LLM and can take 30-90s locally; the request timeout in this
+  collection is set generously to accommodate that.
+}

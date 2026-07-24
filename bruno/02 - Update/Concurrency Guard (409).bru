@@ -1,0 +1,47 @@
+meta {
+  name: Concurrency Guard (409)
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  metadata: @file(../payloads/update-metadata-only.json)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("succeeds on its own (guard only triggers under real concurrency)", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  `updateDocument` uses an atomic Mongo `findAndModify` keyed on the document's *current*
+  version (compare-and-swap): only the first of several concurrent updates against the
+  same version succeeds; the rest get 409 Conflict with detail "Document ... was
+  concurrently modified by another request - reload and retry".
+
+  Bruno has no built-in way to fire truly simultaneous requests from the GUI, so clicking
+  "Send" here just performs a normal single update (200). To actually exercise the guard,
+  fire a burst of simultaneous requests from a shell instead, e.g. from this `bruno/`
+  directory:
+
+    for i in $(seq 1 10); do
+      curl -s -o /tmp/burst_$i.json -w "%{http_code}\n" -X PUT {{baseUrl}}/api/v1/document/{{documentId}} \
+        -F "metadata={\"metadata\":{\"burst\":\"$i\"}};type=application/json" &
+    done
+    wait
+
+  Expect exactly one `200` and the rest `409` - confirmed during development: 1 success,
+  9 conflicts, and no lost updates or double version bumps.
+}

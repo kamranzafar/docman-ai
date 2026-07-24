@@ -1,0 +1,27 @@
+ACCOUNT STATEMENT
+
+Metropolis National Bank
+Statement Period: 2026-06-01 to 2026-06-30
+
+Account Holder: Jane Q. Doe
+Account Number: **** **** **** 4471
+Account Type: Checking
+
+Opening Balance (2026-06-01):                          $4,213.56
+
+Date         Description                    Debit         Credit        Balance
+----------------------------------------------------------------------------
+2026-06-02   Payroll Deposit - Acme Corp                  $2,150.00     $6,363.56
+2026-06-05   Grocery Mart #221               $184.32                    $6,179.24
+2026-06-09   Electric Utility Co.            $96.40                     $6,082.84
+2026-06-14   ATM Withdrawal                  $200.00                    $5,882.84
+2026-06-18   Online Transfer to Savings      $500.00                    $5,382.84
+2026-06-23   Payroll Deposit - Acme Corp                  $2,150.00     $7,532.84
+2026-06-28   Mortgage Payment                $1,340.00                  $6,192.84
+
+Closing Balance (2026-06-30):                           $6,192.84
+
+Total Debits:  $2,320.72
+Total Credits: $4,300.00
+
+For questions about this statement, contact customer service at 1-800-555-0199.

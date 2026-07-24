@@ -1,0 +1,47 @@
+meta {
+  name: Metadata and File (PUT)
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  metadata: @file(../payloads/update-metadata-only.json)
+  file: @file(../documents/invoice-v2.txt) @contentType(text/plain)
+}
+
+script:post-response {
+  if (res.body && res.body.document) {
+    bru.setVar("documentVersion", res.body.document.version);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("bumps version and re-enters the ingestion workflow", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.document.name).to.equal("invoice-v2.txt");
+    expect(res.body.document.status).to.equal("CREATED");
+  });
+}
+
+docs {
+  A `file` part means this is a new version's content: `status` resets to `CREATED` and a
+  fresh Temporal workflow run starts (`doc-wf-{{documentId}}-v{n}`), so the document goes
+  back through upload-wait -> indexing -> classification/summary. The previous version's
+  vector store chunks are deleted first (`documentIndexService.deleteIndex`) so search/RAG
+  never mixes two versions' content - see "Get Metadata - Latest" in `03 - Retrieve` to
+  watch it reach `INDEXED` again (takes ~60-90s locally with Ollama).
+
+  Run "Metadata Only (PUT)" first so `documentVersion` reflects the version being replaced
+  here (not required for this request to work, just for narrative order).
+}
