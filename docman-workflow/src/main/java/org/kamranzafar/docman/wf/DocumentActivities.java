@@ -32,5 +32,7 @@ public interface DocumentActivities {
     @ActivityMethod
     String generateSummary(Document document);
     @ActivityMethod
+    String classifyDocument(Document document);
+    @ActivityMethod
     void notify(String documentId, String msg);
 }

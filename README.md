@@ -5,7 +5,8 @@ Generation) knowledge base, built as a multi-module Spring Boot application orch
 
 Documents are uploaded to object storage, tracked in MongoDB, and asynchronously processed by a
 Temporal workflow that extracts their text, generates vector embeddings, indexes them for search,
-and produces an AI-generated summary — all without blocking the client that uploaded the document.
+produces an AI-generated summary, and classifies the document into a fixed set of types — all
+without blocking the client that uploaded the document.
 
 ## Features
 
@@ -17,12 +18,15 @@ and produces an AI-generated summary — all without blocking the client that up
 - **Concurrent AI summarization**: an Ollama (`llama3.1`) call generates a short summary of every
   ingested document in parallel with indexing, saved back onto the document's metadata; a failed
   or slow summary never blocks the document from being marked as indexed
+- **AI document classification**: once indexing completes, a RAG query over the document's own
+  indexed chunks assigns `documentType` — one of `statements`, `invoices`, `policy documents`,
+  `compliance certificates`, `insurance documents`, `contracts`, or `unknown` — and publishes a
+  Kafka event once done; like summarization, a failed or slow classification never blocks the
+  document from reaching `INDEXED`
 - **Vector search / RAG**: ask natural-language questions and get answers grounded in the indexed
   document content (`nomic-embed-text` embeddings, OpenSearch as the vector store, `llama3.1` chat)
 - **Structured metadata search**: filter documents by arbitrary metadata fields (including document
   type and free-form tags) without needing to know OpenSearch's query syntax
-- **Document classification field** (`documentType`) reserved for future automatic classification,
-  already wired into search
 - **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
   down the MinIO object, the vector store entries, the Mongo record, and cancels any still-running
   ingestion workflow for that document)
