@@ -19,15 +19,37 @@ package org.kamranzafar.docman.service;
 
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentRequest;
+import org.kamranzafar.docman.model.DocumentUpdateRequest;
 
 import java.util.UUID;
 
 public interface DocumentService {
     DocumentDto create(DocumentRequest request);
 
+    /**
+     * Internal/system update (workflow status transitions, summary and classification
+     * merges) - does not bump {@code version} or record a revision. User-driven updates
+     * go through {@link #updateDocument}.
+     */
     DocumentDto update(DocumentDto document);
+
+    /**
+     * User-driven metadata (and optionally file) update. Bumps {@code version}, records
+     * a {@code DocumentRevision} snapshot, and replaces the metadata map outright.
+     *
+     * @param newFileName        the new file's name, or {@code null} for a metadata-only
+     *                           update
+     * @param newFileContentType the new file's content type, or {@code null} for a
+     *                           metadata-only update
+     */
+    DocumentDto updateDocument(UUID id, DocumentUpdateRequest request, String newFileName, String newFileContentType);
 
     void delete(DocumentDto document);
 
     DocumentDto findMetadata(UUID id);
+
+    /**
+     * Looks up a specific past version's metadata snapshot from the revision history.
+     */
+    DocumentDto findMetadata(UUID id, int version);
 }

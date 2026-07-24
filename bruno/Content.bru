@@ -18,3 +18,9 @@ settings {
   encodeUrl: true
   timeout: 0
 }
+
+docs {
+  Returns a presigned download URL for the latest content by default. Append a version
+  number for a specific past version's file instead, e.g. `/document/content/:id/1` -
+  404s if that version never had a file uploaded (e.g. a metadata-only update).
+}

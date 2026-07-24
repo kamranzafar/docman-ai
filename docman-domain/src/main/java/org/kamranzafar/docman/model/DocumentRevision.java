@@ -16,18 +16,32 @@
 
 package org.kamranzafar.docman.model;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 
+import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 
+/**
+ * A point-in-time snapshot of a {@link Document}'s metadata, recorded every time its
+ * version is bumped (a new file upload or a user-driven metadata update), so past
+ * versions remain retrievable after the live record moves on.
+ */
+@org.springframework.data.mongodb.core.mapping.Document(collection = "document_revisions")
+@CompoundIndex(name = "documentId_version_idx", def = "{'documentId': 1, 'version': 1}", unique = true)
 @Data
-public class DocumentRequest {
-    @NotBlank(message = "Name is mandatory")
+public class DocumentRevision {
+    @Id
+    String id;
+    UUID documentId;
+    int version;
     String name;
-    @NotBlank(message = "Content Type is mandatory")
     String contentType;
     String documentType;
     Map<String, Object> metadata;
-    String createdBy;
+    Instant updatedAt;
+    String updatedBy;
+    boolean fileUpdated;
 }

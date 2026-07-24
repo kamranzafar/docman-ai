@@ -1,0 +1,44 @@
+meta {
+  name: Update Presigned
+  type: http
+  seq: 7
+}
+
+post {
+  url: http://localhost:8081/document/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: f102f673-dc48-46d7-9f50-a2526bf80992
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "test.txt",
+    "contentType": "text/plain",
+    "metadata": {
+      "type": "ID_DOC",
+      "lifeCycle": "YR_10"
+    },
+    "updatedBy": "jdoe"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Updates a document to a new file version and returns a presigned MinIO PUT URL, mirroring
+  `Ingest` (creation). `name`/`contentType` are required here (unlike `Update`'s metadata part)
+  since the presigned URL needs the new object key upfront. After this call, PUT the file bytes
+  to the returned `url` - the workflow's upload-wait step picks it up from there, same as
+  creation. For a metadata-only change (no new file), use `Update` instead.
+}
