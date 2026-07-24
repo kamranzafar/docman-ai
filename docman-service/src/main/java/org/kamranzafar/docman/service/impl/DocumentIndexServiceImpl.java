@@ -104,13 +104,12 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             vectorStore.add(splitDocuments);
             log.info("Added Documents to Vector Store {}", vectorStore.getName());
 
-            // OpenSearch's default near-real-time refresh means newly-added chunks
-            // aren't guaranteed searchable immediately after add() returns. Summary
-            // generation and classification both query this document's chunks right
-            // after indexing completes, so force a refresh here rather than let them
-            // race the background refresh cycle and silently see zero results.
-            refreshIndex();
-
+            // Deliberately not forcing a refresh here: at high ingestion rates that
+            // would turn every single document's index() call into its own Lucene
+            // segment flush instead of letting writes batch into the normal refresh
+            // cycle. Summary generation and classification query this document's own
+            // chunks right after indexing, so they retry briefly instead - see
+            // VectorStoreConsistency.
             document.setStatus(DocumentStatus.INDEXED.name());
 
             documentMetadataRepository.save(documentMapper.toEntity(document));
@@ -136,14 +135,17 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                 .value(FieldValue.of(document.getId().toString()))));
 
         try {
+            // No forced refresh here either: this runs off a Kafka consumer, nothing
+            // is synchronously waiting on the result, so it's fine to let it become
+            // visible on the next natural refresh cycle rather than force one per
+            // update at whatever rate updates arrive.
             UpdateByQueryResponse response = openSearchClient.updateByQuery(u -> u
                     .index(indexName)
                     .query(filter)
                     .script(s -> s.inline(i -> i
                             .lang("painless")
                             .source(METADATA_MERGE_SCRIPT)
-                            .params("metadata", JsonData.of(mergeFields))))
-                    .refresh(true));
+                            .params("metadata", JsonData.of(mergeFields)))));
 
             log.info("Synced metadata into {} indexed chunk(s) for document {}",
                     response.updated(), document.getId());
@@ -160,13 +162,5 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
         vectorStore.delete(filter);
         log.info("Deleted vector store entries for document {}", document.getId());
-    }
-
-    private void refreshIndex() {
-        try {
-            openSearchClient.indices().refresh(r -> r.index(indexName));
-        } catch (IOException e) {
-            throw new DocmanException("Failed to refresh vector index", e);
-        }
     }
 }

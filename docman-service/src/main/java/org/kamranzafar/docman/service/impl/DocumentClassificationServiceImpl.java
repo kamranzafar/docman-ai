@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -68,6 +69,16 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
         Filter.Expression documentFilter = new FilterExpressionBuilder()
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();
+
+        // Cheap existence check (with brief retry) before the expensive LLM call,
+        // since indexing doesn't force a refresh - see VectorStoreConsistency.
+        List<org.springframework.ai.document.Document> existing = VectorStoreConsistency.awaitChunks(vectorStore,
+                SearchRequest.builder().filterExpression(documentFilter).topK(1).build());
+
+        if (existing.isEmpty()) {
+            log.info("No indexed chunks for document {}, defaulting classification to unknown", document.getId());
+            return DocumentType.UNKNOWN.getLabel();
+        }
 
         log.info("Classifying document {}", document.getId());
 
