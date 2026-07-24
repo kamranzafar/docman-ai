@@ -82,7 +82,7 @@ mvn clean package
 mvn -pl docman-api -am spring-boot:run
 ```
 
-The API is served on `http://localhost:8088` by default (see
+The API is served on `http://localhost:8081` by default (see
 [`docs/SETUP.md`](docs/SETUP.md#configuration-reference) for how to change it, including a note
 about a port clash with the bundled Temporal container).
 
