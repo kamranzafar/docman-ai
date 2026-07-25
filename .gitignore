@@ -36,3 +36,4 @@ build/
 /.claude/
 /.mvn/
 /docman-api/logs/
+/logs/
