@@ -20,6 +20,7 @@ package org.kamranzafar.docman.wf;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentStatus;
 
 @ActivityInterface
 public interface DocumentActivities {
@@ -34,5 +35,5 @@ public interface DocumentActivities {
     @ActivityMethod
     String classifyDocument(Document document);
     @ActivityMethod
-    void notify(String documentId, String msg);
+    void notify(String documentId, DocumentStatus status, String errorMessage);
 }

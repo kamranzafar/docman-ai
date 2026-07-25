@@ -17,6 +17,19 @@
 
 package org.kamranzafar.docman.model;
 
-public enum DocumentStatus {
-    CREATED, INGESTED, UPDATED, INDEXED, SUMMARIZED, CLASSIFIED, FAILED
+import java.time.Instant;
+
+public record DocumentNotification(
+        DocumentStatus status,
+        String documentId,
+        Instant timestamp,
+        String errorMessage
+) {
+    public static DocumentNotification of(String documentId, DocumentStatus status) {
+        return new DocumentNotification(status, documentId, Instant.now(), null);
+    }
+
+    public static DocumentNotification failed(String documentId, String errorMessage) {
+        return new DocumentNotification(DocumentStatus.FAILED, documentId, Instant.now(), errorMessage);
+    }
 }
