@@ -22,22 +22,40 @@ import java.util.Arrays;
  * The fixed set of categories the AI classifier can assign to a document.
  */
 public enum DocumentType {
-    STATEMENTS("statements"),
-    INVOICES("invoices"),
-    POLICY_DOCUMENTS("policy documents"),
-    COMPLIANCE_CERTIFICATES("compliance certificates"),
-    INSURANCE_DOCUMENTS("insurance documents"),
-    CONTRACTS("contracts"),
-    UNKNOWN("unknown");
+    STATEMENTS("statements",
+            "Periodic account statements, such as bank, credit card, or brokerage statements, "
+                    + "summarizing transactions and balances over a period"),
+    INVOICES("invoices",
+            "Bills or requests for payment for goods or services rendered, itemizing charges, "
+                    + "quantities, and the amount due"),
+    POLICY_DOCUMENTS("policyDocuments",
+            "Internal or organizational policy documents describing rules, procedures, guidelines, "
+                    + "or terms of service - not insurance policies"),
+    COMPLIANCE_CERTIFICATES("complianceCertificates",
+            "Certificates or attestations confirming compliance with a regulation, standard, or "
+                    + "audit, such as an ISO certification or a regulatory attestation"),
+    INSURANCE_DOCUMENTS("insuranceDocuments",
+            "Insurance policies, coverage summaries, declarations pages, or claims documentation "
+                    + "issued by an insurer"),
+    CONTRACTS("contracts",
+            "Legally binding agreements between two or more parties establishing their obligations, "
+                    + "terms, and conditions"),
+    UNKNOWN("unknown", "The document does not clearly match any of the other categories");
 
     private final String label;
+    private final String description;
 
-    DocumentType(String label) {
+    DocumentType(String label, String description) {
         this.label = label;
+        this.description = description;
     }
 
     public String getLabel() {
         return label;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     /**
@@ -54,7 +72,10 @@ public enum DocumentType {
 
         return Arrays.stream(values())
                 .filter(type -> type != UNKNOWN)
-                .filter(type -> normalized.equals(type.label) || normalized.contains(type.label))
+                .filter(type -> {
+                    String label = type.label.toLowerCase();
+                    return normalized.equals(label) || normalized.contains(label);
+                })
                 .findFirst()
                 .orElse(UNKNOWN);
     }

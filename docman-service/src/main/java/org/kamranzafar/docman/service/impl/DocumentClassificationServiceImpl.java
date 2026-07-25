@@ -39,9 +39,11 @@ import java.util.stream.Collectors;
 @Service
 public class DocumentClassificationServiceImpl implements DocumentClassificationService {
     private static final String CLASSIFICATION_QUESTION = """
-            What type of document is this? Respond with exactly one of these categories: %s.
-            If the document does not clearly match any of these categories, respond with "unknown". \
-            Respond with only the category name, no preamble or punctuation.""";
+            What type of document is this? Choose exactly one category from the list below, using \
+            the description of each to pick the best match:
+            %s
+            If the document does not clearly match any of these categories, respond with "unknown".
+            Respond with only the category name (e.g. "invoices"), no preamble, explanation, or punctuation.""";
 
     // Classification picks a single category label, so a low temperature keeps
     // the answer stable instead of drifting between similar categories on
@@ -60,8 +62,8 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
     public String classify(DocumentDto document) {
         String categories = Arrays.stream(DocumentType.values())
                 .filter(type -> type != DocumentType.UNKNOWN)
-                .map(DocumentType::getLabel)
-                .collect(Collectors.joining(", "));
+                .map(type -> "- " + type.getLabel() + ": " + type.getDescription())
+                .collect(Collectors.joining("\n"));
 
         // Chunks are already embedded in the vector store from indexing, so
         // classification reuses that instead of re-fetching and re-parsing the

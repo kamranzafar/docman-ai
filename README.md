@@ -17,8 +17,8 @@ without blocking the client that uploaded the document.
   thread-cheap wait for slow or delayed uploads
 - **AI summarization and classification**: once indexing completes, two RAG queries over the
   document's own indexed chunks run concurrently with each other — one generates a short summary,
-  the other assigns `documentType` (one of `statements`, `invoices`, `policy documents`,
-  `compliance certificates`, `insurance documents`, `contracts`, or `unknown`) — each publishing a
+  the other assigns `documentType` (one of `statements`, `invoices`, `policyDocuments`,
+  `complianceCertificates`, `insuranceDocuments`, `contracts`, or `unknown`) — each publishing a
   Kafka event once done; a failed or slow summary/classification never blocks the document from
   reaching `INDEXED`
 - **Vector search / RAG**: ask natural-language questions and get answers grounded in the indexed

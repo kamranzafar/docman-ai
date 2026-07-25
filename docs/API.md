@@ -37,7 +37,7 @@ persisted field; see
 whatever the caller optionally supplied at creation, then gets overwritten once ingestion finishes:
 an AI classification step (see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) assigns one of `statements`,
-`invoices`, `policy documents`, `compliance certificates`, `insurance documents`, `contracts`, or
+`invoices`, `policyDocuments`, `complianceCertificates`, `insuranceDocuments`, `contracts`, or
 `unknown` if the document doesn't clearly match any of those. `metadata` is an arbitrary map
 supplied by the caller at creation time; the system adds a `summary` key to it once AI
 summarization completes.

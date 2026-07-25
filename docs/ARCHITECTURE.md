@@ -304,8 +304,8 @@ and re-running Tika a second time:
   `null` and the workflow skips the summary rather than storing a hallucinated one.
 - **`DocumentClassificationServiceImpl`** runs a `QuestionAnswerAdvisor`-based RAG query scoped the
   same way, asking `llama3.1` to pick exactly one of a fixed set of categories (`DocumentType`, in
-  `docman-domain`): `statements`, `invoices`, `policy documents`, `compliance certificates`,
-  `insurance documents`, `contracts` — or `unknown` if the document doesn't clearly match any of
+  `docman-domain`): `statements`, `invoices`, `policyDocuments`, `complianceCertificates`,
+  `insuranceDocuments`, `contracts` — or `unknown` if the document doesn't clearly match any of
   them (also the fallback if the model's response doesn't match a known label, or if the activity
   throws). It runs at `temperature 0` (unlike the `1` used for RAG answers and summaries, configured
   via `spring.ai.ollama.chat.options.temperature` in `application.yaml`) via a per-call
