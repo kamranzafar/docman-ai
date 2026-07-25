@@ -127,14 +127,12 @@ sequenceDiagram
         WF->>Act: checkUploadStatus()
         Act->>MinIO: stat object
     end
-    WF->>WF: status=INGESTED
-    WF->>Act: update(document)
-    Act->>Mongo: save
+    WF->>Act: updateStatus(INGESTED)
+    Act->>Mongo: $set status only
     WF->>Act: notify(INGESTED)
     Act->>Kafka: publish {status: INGESTED, documentId, timestamp}
     WF->>Act: index(document)
     Act->>Idx: extract, chunk, embed, index
-    WF->>WF: status=INDEXED
     par concurrently
         WF->>Act: generateSummary(document)
         Act->>Sum: ask Ollama for a summary, grounded in this document's own indexed chunks
@@ -142,26 +140,27 @@ sequenceDiagram
         WF->>Act: classifyDocument(document)
         Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
     end
-    WF->>WF: merge summary into metadata
     alt summary succeeded
+        WF->>Act: mergeSummary(summary)
+        Act->>Mongo: $set metadata.summary only
         WF->>Act: notify(SUMMARIZED)
     else summary failed
         WF->>Act: notify(FAILED, errorMessage)
     end
     Act->>Kafka: publish event
-    WF->>Act: update(merged document)
-    Act->>Mongo: save
+    WF->>Act: updateStatus(INDEXED)
+    Act->>Mongo: $set status only
     WF->>Act: notify(INDEXED)
     Act->>Kafka: publish {status: INDEXED, documentId, timestamp}
-    WF->>WF: merge documentType (or "unknown" on failure)
     alt classification succeeded
         WF->>Act: notify(CLASSIFIED)
     else classification failed
+        WF->>WF: documentType = "unknown"
         WF->>Act: notify(FAILED, errorMessage)
     end
     Act->>Kafka: publish event
-    WF->>Act: update(document)
-    Act->>Mongo: save
+    WF->>Act: updateDocumentType(documentType)
+    Act->>Mongo: $set documentType only
 ```
 
 Key design points:
@@ -175,6 +174,15 @@ Key design points:
   the chunks indexing just wrote to the vector store rather than re-reading raw content from
   MinIO — see [Document Summarization & Classification](#document-summarization--classification).
   They run concurrently with *each other*, but neither can start until indexing has finished.
+- **Every workflow-driven Mongo write is a targeted `$set` on the one field it owns**
+  (`updateStatus`/`mergeSummary`/`updateDocumentType`, plus the outer catch block's `updateStatus`
+  on failure), never a full document replace. The `document` object the workflow carries is a
+  snapshot captured once when it started; ingestion (especially the LLM calls) can run for minutes,
+  during which a user-driven `PUT /api/v1/document/{id}` can concurrently bump `version` or change
+  `metadata`. A full replace using the stale snapshot would silently revert those concurrent
+  changes — `mergeSummary` in particular uses Mongo dot-notation (`metadata.summary`) so it adds
+  the AI-generated summary without touching any other metadata key a concurrent update may have
+  changed.
 - **A failed summary or classification never fails the document.** Both get their own activity
   stub with a 10-minute timeout and a single attempt (retrying a slow-but-correct LLM call wastes
   time for no benefit); if either throws, the workflow logs it and continues (classification falls
@@ -275,6 +283,12 @@ for a specific version also checks MinIO object existence first and 404s if that
 had a file uploaded (e.g. a metadata-only revision) — the "latest" path doesn't do this extra
 check, matching its existing behavior.
 
+`GET /api/v1/document/revisions/{id}` returns the entire history in one call — every
+`DocumentRevision` for the id, oldest first, mapped to the same metadata-only `DocumentDto` shape
+`GET /api/v1/document/metadata/{id}/{version}` uses for a single version (`status` always `null`,
+content never included). It 404s when the id has no revisions at all, the same "document not
+found" condition as the other lookups.
+
 ## Document Summarization & Classification
 
 Once indexing completes, two independent AI steps run concurrently, both grounded in the chunks
@@ -351,9 +365,12 @@ knowing:
   the pre-update value for a `documentType`/metadata filter until the Kafka message is consumed
   (typically milliseconds to a couple of seconds locally). `GET /api/v1/document/metadata/{id}` (reading
   straight from Mongo) is always current.
-- It runs on **every** `update()` call, including the very first one (`INGESTED` status, before
-  indexing has written anything) — `update_by_query` simply matches zero chunks in that case, which
-  is a harmless no-op logged at `info` level (`Synced metadata into 0 indexed chunk(s)...`).
+- It's triggered by `mergeSummary`/`updateDocumentType`/`updateDocument` — the calls that actually
+  change `metadata`/`documentType` — not by `updateStatus`, since a status transition alone never
+  affects chunk metadata. The first trigger for a given document is typically the summary merge,
+  by which point indexing has already written chunks for `update_by_query` to match; if it ever
+  fires before that, it's a harmless no-op logged at `info` level (`Synced metadata into 0 indexed
+  chunk(s)...`).
 
 ## Search & RAG
 

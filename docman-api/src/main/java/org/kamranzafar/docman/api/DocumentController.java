@@ -37,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -211,6 +212,16 @@ public class DocumentController {
 
         DocumentSearchResponse response = DocumentSearchResponse.builder().build();
         response.setDocuments(Collections.singletonList(document));
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revisions/{id}")
+    public ResponseEntity<?> getRevisions(@PathVariable String id) {
+        List<DocumentDto> revisions = documentService.findRevisions(parseId(id));
+
+        DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+        response.setDocuments(revisions);
 
         return ResponseEntity.ok(response);
     }

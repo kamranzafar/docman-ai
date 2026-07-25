@@ -34,6 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @ActivityImpl(taskQueues = "documents")
 public class DocumentActivitiesImpl implements DocumentActivities {
@@ -55,8 +57,18 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     private ObjectMapper objectMapper;
 
     @Override
-    public Document update(Document document) {
-        return documentMapper.toEntity(documentService.update(documentMapper.toDto(document)));
+    public void updateStatus(String documentId, DocumentStatus status) {
+        documentService.updateStatus(UUID.fromString(documentId), status.name());
+    }
+
+    @Override
+    public void mergeSummary(String documentId, String summary) {
+        documentService.mergeSummary(UUID.fromString(documentId), summary);
+    }
+
+    @Override
+    public void updateDocumentType(String documentId, String documentType) {
+        documentService.updateDocumentType(UUID.fromString(documentId), documentType);
     }
 
     @Override

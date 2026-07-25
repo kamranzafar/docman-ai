@@ -28,6 +28,7 @@ import org.kamranzafar.docman.model.DocumentRequest;
 import org.kamranzafar.docman.model.DocumentRevision;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.DocumentUpdateRequest;
+import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.repository.DocumentMetadataRepository;
 import org.kamranzafar.docman.repository.DocumentRevisionRepository;
 import org.kamranzafar.docman.service.DocumentService;
@@ -45,9 +46,11 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -92,18 +95,52 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Transactional
     @Override
-    public DocumentDto update(DocumentDto documentDto) {
-        log.info("Updating a document with id {}", documentDto.getId());
-        Document document = documentMapper.toEntity(documentDto);
-        String status = document.getStatus() != null ? document.getStatus() : DocumentStatus.UPDATED.name();
-        Document saved = saveDocument(document, status);
+    public void updateStatus(UUID id, String status) {
+        log.info("Updating status for document {} to {}", id, status);
 
-        // Triggers an async metadata-only sync into the vector store's already-indexed
-        // chunks (see DocumentIndexSyncConsumer), so summary/classification results and
-        // any other metadata change are reflected there without a full reindex.
-        kafkaTemplate.send(metadataSyncTopic, saved.getId().toString());
+        // Targeted field update, not a full document replace: the workflow caller only
+        // ever intends to change status here, so nothing else - version, metadata,
+        // documentType, etc. - is touched, regardless of what a concurrent user-driven
+        // updateDocument() call may have set them to in the meantime.
+        applyUpdate(id, Update.update("status", status));
 
-        return documentMapper.toDto(saved);
+        // status never affects the vector store's chunk metadata (see
+        // DocumentIndexServiceImpl.updateMetadata), so there's nothing to sync here.
+    }
+
+    @Transactional
+    @Override
+    public void mergeSummary(UUID id, String summary) {
+        log.info("Merging summary into metadata for document {}", id);
+
+        // Dot-notation targeted update: only metadata.summary is touched, so a
+        // concurrent user-driven change to any other metadata key (made while
+        // summarization - an LLM call that can take up to minutes - was still running)
+        // survives instead of being overwritten by this workflow step's own stale
+        // in-memory metadata snapshot.
+        applyUpdate(id, Update.update("metadata." + QueryConstants.SUMMARY_METADATA_KEY, summary));
+
+        kafkaTemplate.send(metadataSyncTopic, id.toString());
+    }
+
+    @Transactional
+    @Override
+    public void updateDocumentType(UUID id, String documentType) {
+        log.info("Updating documentType for document {} to {}", id, documentType);
+
+        applyUpdate(id, Update.update("documentType", documentType));
+
+        kafkaTemplate.send(metadataSyncTopic, id.toString());
+    }
+
+    private void applyUpdate(UUID id, Update update) {
+        Query query = Query.query(Criteria.where("_id").is(id));
+        Document saved = mongoTemplate.findAndModify(
+                query, update, FindAndModifyOptions.options().returnNew(true), Document.class);
+
+        if (saved == null) {
+            throw new DocumentNotFoundException("Document not found");
+        }
     }
 
     @Transactional
@@ -212,12 +249,24 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public DocumentDto findMetadata(UUID id, int version) {
         log.info("Finding document metadata with id {} at version {}", id, version);
-        Optional<DocumentRevision> op = documentRevisionRepository.findByDocumentIdAndVersion(id, version);
-        if (op.isEmpty()) {
-            throw new DocumentNotFoundException("Document version not found");
+        DocumentRevision revision = documentRevisionRepository.findByDocumentIdAndVersion(id, version)
+                .orElseThrow(() -> new DocumentNotFoundException("Document version not found"));
+
+        return toDto(revision);
+    }
+
+    @Override
+    public List<DocumentDto> findRevisions(UUID id) {
+        log.info("Finding revision history for document {}", id);
+        List<DocumentRevision> revisions = documentRevisionRepository.findByDocumentIdOrderByVersionAsc(id);
+        if (revisions.isEmpty()) {
+            throw new DocumentNotFoundException("Document not found");
         }
 
-        DocumentRevision revision = op.get();
+        return revisions.stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    private DocumentDto toDto(DocumentRevision revision) {
         return DocumentDto.builder()
                 .id(revision.getDocumentId())
                 .name(revision.getName())

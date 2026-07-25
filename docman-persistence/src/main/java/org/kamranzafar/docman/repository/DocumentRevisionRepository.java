@@ -20,11 +20,14 @@ package org.kamranzafar.docman.repository;
 import org.kamranzafar.docman.model.DocumentRevision;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface DocumentRevisionRepository extends MongoRepository<DocumentRevision, String> {
     Optional<DocumentRevision> findByDocumentIdAndVersion(UUID documentId, int version);
+
+    List<DocumentRevision> findByDocumentIdOrderByVersionAsc(UUID documentId);
 
     void deleteByDocumentId(UUID documentId);
 }
