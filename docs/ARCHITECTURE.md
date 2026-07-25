@@ -32,7 +32,7 @@ flowchart LR
 | Metadata store           | MongoDB (Spring Data MongoDB)      | `Document` records (id, name, content type, status, document type, metadata, audit fields, version) plus a `document_revisions` collection tracking every past version's snapshot |
 | Vector store              | OpenSearch                        | Chunk embeddings + per-chunk metadata for RAG and structured search   |
 | Workflow orchestration     | Temporal                          | Durable, retryable ingestion pipeline                                |
-| Eventing                   | Kafka                             | Lifecycle notifications for every ingestion stage, plus a metadata-sync trigger topic |
+| Eventing                   | Kafka                             | JSON lifecycle notifications (`DocumentNotification`) for every ingestion stage, plus a metadata-sync trigger topic |
 | Text extraction              | Apache Tika (via Spring AI)        | Extracts text from PDF/DOC/TXT/etc.                                  |
 | Embeddings                    | Ollama `nomic-embed-text`          | 768-dimension vectors for chunked document text                      |
 | Chat / RAG answers                | Ollama `llama3.1`                  | Answers questions grounded in indexed document content               |
@@ -74,21 +74,27 @@ the controller and all service-layer method signatures use `DocumentDto` instead
 
 ## Document Lifecycle
 
-A `Document` moves through these statuses (`DocumentStatus`):
+A `Document`'s persisted `status` field moves through these values:
 
 ```mermaid
 stateDiagram-v2
     [*] --> CREATED: POST/PUT /api/v1/document
-    CREATED --> UPLOADED: content lands in MinIO
-    UPLOADED --> INDEXED: text extracted, embedded, and summarized
+    CREATED --> INGESTED: content lands in MinIO
+    INGESTED --> INDEXED: text extracted, embedded, and summarized
     CREATED --> FAILED: upload never arrives, or indexing fails
-    UPLOADED --> FAILED: indexing fails
+    INGESTED --> FAILED: indexing fails
     INDEXED --> [*]: DELETE /api/v1/document
     FAILED --> [*]: DELETE /api/v1/document
 ```
 
 `UPDATED` also exists on the enum as a generic "metadata was updated" status, used by the shared
 `update()` service method independent of the ingestion pipeline.
+
+`DocumentStatus` has two more values, `SUMMARIZED` and `CLASSIFIED`, but they're **transient
+Kafka-notification statuses only** — the workflow publishes them once the respective step
+completes, but never writes them to the `Document`'s persisted `status` field (see
+[Ingestion Workflow](#ingestion-workflow)). `GET /api/v1/document/metadata/{id}` will therefore
+never return `SUMMARIZED` or `CLASSIFIED` as a document's `status`.
 
 `status` and `version` are independent axes: `status` tracks where the *current* version is in
 the ingestion pipeline; `version` is a monotonically increasing counter that only moves on
@@ -115,15 +121,17 @@ sequenceDiagram
     participant Mongo
     participant Kafka
 
-    WF->>Act: notify("Document Created")
-    Act->>Kafka: publish event
+    WF->>Act: notify(CREATED)
+    Act->>Kafka: publish {status: CREATED, documentId, timestamp}
     loop until uploaded (durable timer, no worker thread held)
         WF->>Act: checkUploadStatus()
         Act->>MinIO: stat object
     end
-    WF->>Act: update(status=UPLOADED)
+    WF->>WF: status=INGESTED
+    WF->>Act: update(document)
     Act->>Mongo: save
-    Act->>Kafka: publish "Content Uploaded"
+    WF->>Act: notify(INGESTED)
+    Act->>Kafka: publish {status: INGESTED, documentId, timestamp}
     WF->>Act: index(document)
     Act->>Idx: extract, chunk, embed, index
     WF->>WF: status=INDEXED
@@ -135,13 +143,25 @@ sequenceDiagram
         Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
     end
     WF->>WF: merge summary into metadata
+    alt summary succeeded
+        WF->>Act: notify(SUMMARIZED)
+    else summary failed
+        WF->>Act: notify(FAILED, errorMessage)
+    end
+    Act->>Kafka: publish event
     WF->>Act: update(merged document)
     Act->>Mongo: save
-    Act->>Kafka: publish "Document Indexed"
+    WF->>Act: notify(INDEXED)
+    Act->>Kafka: publish {status: INDEXED, documentId, timestamp}
     WF->>WF: merge documentType (or "unknown" on failure)
+    alt classification succeeded
+        WF->>Act: notify(CLASSIFIED)
+    else classification failed
+        WF->>Act: notify(FAILED, errorMessage)
+    end
+    Act->>Kafka: publish event
     WF->>Act: update(document)
     Act->>Mongo: save
-    Act->>Kafka: publish "Document Classified: {documentType}"
 ```
 
 Key design points:
@@ -162,7 +182,25 @@ Key design points:
   still fails the whole document (index/embed/search is the core capability; summarization and
   classification are supplementary).
 - **Every step publishes a Kafka event** (`documents` topic) so external systems can observe
-  ingestion progress without polling the API.
+  ingestion progress without polling the API. Each event is a `DocumentNotification`
+  (`docman-domain`), serialized to JSON by `DocumentActivitiesImpl.notify` and deserialized back by
+  `KafkaConsumer`:
+
+  ```json
+  {
+    "status": "INDEXED",
+    "documentId": "a391f59e-f0fb-4d98-a36c-9f7706cebb8a",
+    "timestamp": "2026-07-25T03:25:20.569049Z",
+    "errorMessage": null
+  }
+  ```
+
+  `status` is any `DocumentStatus` value, including the two that never reach the persisted
+  `Document.status` field (`SUMMARIZED`, `CLASSIFIED` — see [Document
+  Lifecycle](#document-lifecycle)). `errorMessage` is only populated when `status` is `FAILED`; a
+  step's own failure (summary generation, classification) publishes `FAILED` with a message
+  describing *that* step without failing the rest of the workflow, distinct from the workflow-level
+  `FAILED` published from the outer catch block when the whole document fails.
 
 ## Document Versioning & Revision History
 
@@ -277,8 +315,9 @@ extractable text short-circuits straight to `unknown` instead of asking the mode
 nothing; summarization's own retrieval reuses the same helper directly.
 
 Once a category is decided, the workflow persists `documentType` on the `Document` record and
-publishes a `Document Classified: {documentType}` Kafka event — separate from the `Document
-Indexed` event, since classification finishes independently of the summary merge.
+publishes a `CLASSIFIED` Kafka event — separate from the `INDEXED` event, since classification
+finishes independently of the summary merge. Summarization publishes its own `SUMMARIZED` event the
+same way once the summary is merged into `metadata`.
 
 Persisting `documentType` (like every other `DocumentService.update()` call) also triggers the
 vector store metadata sync described below, so the chunk metadata written at indexing time — which
@@ -312,7 +351,7 @@ knowing:
   the pre-update value for a `documentType`/metadata filter until the Kafka message is consumed
   (typically milliseconds to a couple of seconds locally). `GET /api/v1/document/metadata/{id}` (reading
   straight from Mongo) is always current.
-- It runs on **every** `update()` call, including the very first one (`UPLOADED` status, before
+- It runs on **every** `update()` call, including the very first one (`INGESTED` status, before
   indexing has written anything) — `update_by_query` simply matches zero chunks in that case, which
   is a harmless no-op logged at `info` level (`Synced metadata into 0 indexed chunk(s)...`).
 

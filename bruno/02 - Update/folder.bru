@@ -11,7 +11,7 @@ docs {
 
   Two independent axes:
   - Metadata-only update vs. metadata + new file (the latter bumps back through the full
-    ingestion workflow: `CREATED -> UPLOADED -> INDEXED` plus re-classification/summary).
+    ingestion workflow: `CREATED -> INGESTED -> INDEXED` plus re-classification/summary).
   - Direct (`PUT`, file bytes in the request) vs. presigned (`POST`, returns a MinIO PUT
     URL for the client to upload to separately) - mirrors the same two shapes as create.
 

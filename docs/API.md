@@ -29,8 +29,11 @@ Every endpoint that returns a document uses this shape (`DocumentDto`):
 }
 ```
 
-`status` is one of `CREATED`, `UPLOADED`, `UPDATED`, `INDEXED`, `FAILED` (see
-[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-lifecycle)). `documentType` starts out as
+`status` is one of `CREATED`, `INGESTED`, `UPDATED`, `INDEXED`, `FAILED` (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-lifecycle) — the Kafka lifecycle notifications
+carry two additional transient values, `SUMMARIZED`/`CLASSIFIED`, that never appear in this
+persisted field; see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#ingestion-workflow)). `documentType` starts out as
 whatever the caller optionally supplied at creation, then gets overwritten once ingestion finishes:
 an AI classification step (see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) assigns one of `statements`,
