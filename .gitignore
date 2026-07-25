@@ -35,3 +35,4 @@ build/
 /CLAUDE.md
 /.claude/
 /.mvn/
+/docman-api/logs/
