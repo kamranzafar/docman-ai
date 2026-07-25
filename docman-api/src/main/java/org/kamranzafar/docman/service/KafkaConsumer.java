@@ -17,15 +17,22 @@
 
 package org.kamranzafar.docman.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.kamranzafar.docman.model.DocumentNotification;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class KafkaConsumer {
+    private final ObjectMapper objectMapper;
+
     @KafkaListener(topics = "documents", groupId = "docman")
-    public void listenToDocumentEvent(String message) {
-        log.info("Received Message in group docman: {}", message);
+    public void listenToDocumentEvent(String message) throws Exception {
+        DocumentNotification notification = objectMapper.readValue(message, DocumentNotification.class);
+        log.info("Received document notification in group docman: {}", notification);
     }
 }

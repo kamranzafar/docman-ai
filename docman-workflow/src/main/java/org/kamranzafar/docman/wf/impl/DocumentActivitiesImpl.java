@@ -17,9 +17,13 @@
 
 package org.kamranzafar.docman.wf.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.temporal.spring.boot.ActivityImpl;
 import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.Document;
+import org.kamranzafar.docman.model.DocumentNotification;
+import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.service.DocumentClassificationService;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.DocumentService;
@@ -47,6 +51,8 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     private DocumentClassificationService documentClassificationService;
     @Autowired
     private DocumentMapper documentMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     public Document update(Document document) {
@@ -74,7 +80,14 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     }
 
     @Override
-    public void notify(String documentId, String msg) {
-        kafkaTemplate.send("documents", String.format("Document %s: %s", documentId, msg));
+    public void notify(String documentId, DocumentStatus status, String errorMessage) {
+        DocumentNotification notification = status == DocumentStatus.FAILED
+                ? DocumentNotification.failed(documentId, errorMessage)
+                : DocumentNotification.of(documentId, status);
+        try {
+            kafkaTemplate.send("documents", objectMapper.writeValueAsString(notification));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize document notification", e);
+        }
     }
 }

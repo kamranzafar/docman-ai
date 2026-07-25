@@ -104,18 +104,18 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
         DocumentActivities activity = activities.get();
 
         try {
-            activity.notify(document.getId().toString(), "Document Created");
+            activity.notify(document.getId().toString(), DocumentStatus.CREATED, null);
 
             waitForUpload(document);
 
-            document.setStatus(DocumentStatus.UPLOADED.name());
+            document.setStatus(DocumentStatus.INGESTED.name());
 
             Async.function(() -> {
                 activity.update(document);
                 return null;
             }).get();
 
-            activity.notify(document.getId().toString(), "Document Content Uploaded");
+            activity.notify(document.getId().toString(), DocumentStatus.INGESTED, null);
 
             Promise<Void> indexPromise = Async.function(() -> {
                 activity.index(document);
@@ -139,33 +139,35 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                     metadata.put(QueryConstants.SUMMARY_METADATA_KEY, summary);
                     document.setMetadata(metadata);
                 }
+                activity.notify(document.getId().toString(), DocumentStatus.SUMMARIZED, null);
             } catch (RuntimeException e) {
                 // Summary generation is a supplementary enhancement, not core to
                 // ingestion succeeding - don't fail the whole document over it.
                 log.warn("Summary generation failed for document {}: {}", document.getId(), e.getMessage());
-                activity.notify(document.getId().toString(), "Document Summary Generation Failed: " + e.getMessage());
+                activity.notify(document.getId().toString(), DocumentStatus.FAILED, "Summary generation failed: " + e.getMessage());
             }
 
             activity.update(document);
-            activity.notify(document.getId().toString(), "Document Indexed");
+            activity.notify(document.getId().toString(), DocumentStatus.INDEXED, null);
 
             try {
                 String documentType = classificationPromise.get();
                 document.setDocumentType(documentType != null && !documentType.isBlank()
                         ? documentType : DocumentType.UNKNOWN.getLabel());
+                activity.notify(document.getId().toString(), DocumentStatus.CLASSIFIED, null);
             } catch (RuntimeException e) {
                 // Classification is a supplementary enhancement, not core to
                 // ingestion succeeding - don't fail the whole document over it.
                 log.warn("Classification failed for document {}: {}", document.getId(), e.getMessage());
                 document.setDocumentType(DocumentType.UNKNOWN.getLabel());
+                activity.notify(document.getId().toString(), DocumentStatus.FAILED, "Classification failed: " + e.getMessage());
             }
 
             activity.update(document);
-            activity.notify(document.getId().toString(), "Document Classified: " + document.getDocumentType());
         } catch (RuntimeException e) {
             document.setStatus(DocumentStatus.FAILED.name());
             activity.update(document);
-            activity.notify(document.getId().toString(), "Document Processing Failed: " + e.getMessage());
+            activity.notify(document.getId().toString(), DocumentStatus.FAILED, e.getMessage());
             throw e;
         }
     }
