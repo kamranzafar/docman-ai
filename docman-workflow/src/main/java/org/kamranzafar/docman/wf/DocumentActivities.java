@@ -25,7 +25,11 @@ import org.kamranzafar.docman.model.DocumentStatus;
 @ActivityInterface
 public interface DocumentActivities {
     @ActivityMethod
-    Document update(Document document);
+    void updateStatus(String documentId, DocumentStatus status);
+    @ActivityMethod
+    void mergeSummary(String documentId, String summary);
+    @ActivityMethod
+    void updateDocumentType(String documentId, String documentType);
     @ActivityMethod
     boolean checkUploadStatus(Document document);
     @ActivityMethod

@@ -111,7 +111,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
             document.setStatus(DocumentStatus.INGESTED.name());
 
             Async.function(() -> {
-                activity.update(document);
+                activity.updateStatus(document.getId().toString(), DocumentStatus.INGESTED);
                 return null;
             }).get();
 
@@ -138,6 +138,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                             ? new HashMap<>(document.getMetadata()) : new HashMap<>();
                     metadata.put(QueryConstants.SUMMARY_METADATA_KEY, summary);
                     document.setMetadata(metadata);
+                    activity.mergeSummary(document.getId().toString(), summary);
                 }
                 activity.notify(document.getId().toString(), DocumentStatus.SUMMARIZED, null);
             } catch (RuntimeException e) {
@@ -147,7 +148,7 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                 activity.notify(document.getId().toString(), DocumentStatus.FAILED, "Summary generation failed: " + e.getMessage());
             }
 
-            activity.update(document);
+            activity.updateStatus(document.getId().toString(), DocumentStatus.INDEXED);
             activity.notify(document.getId().toString(), DocumentStatus.INDEXED, null);
 
             try {
@@ -163,10 +164,10 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
                 activity.notify(document.getId().toString(), DocumentStatus.FAILED, "Classification failed: " + e.getMessage());
             }
 
-            activity.update(document);
+            activity.updateDocumentType(document.getId().toString(), document.getDocumentType());
         } catch (RuntimeException e) {
             document.setStatus(DocumentStatus.FAILED.name());
-            activity.update(document);
+            activity.updateStatus(document.getId().toString(), DocumentStatus.FAILED);
             activity.notify(document.getId().toString(), DocumentStatus.FAILED, e.getMessage());
             throw e;
         }

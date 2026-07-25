@@ -276,6 +276,38 @@ curl "http://localhost:8081/api/v1/document/metadata/a391f59e-f0fb-4d98-a36c-9f7
 
 ---
 
+## `GET /api/v1/document/revisions/{id}` — fetch a document's full revision history
+
+Returns every recorded version's metadata snapshot from the revision history, oldest first —
+metadata only, never file content (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-versioning--revision-history)). Each entry is
+the same shape a specific-version lookup (`GET /api/v1/document/metadata/{id}/{version}`) returns
+for that version, so `status` is always `null` on every entry (it's a live-workflow concept, not
+part of a point-in-time snapshot) — use `GET /api/v1/document/metadata/{id}` for the live
+document's current `status`.
+
+**Path parameter**: `id` — the document UUID.
+
+**Response** `200 OK` (`DocumentSearchResponse`):
+
+```json
+{
+  "documents": [
+    { "...": "DocumentDto, version: 1, status: null" },
+    { "...": "DocumentDto, version: 2, status: null" }
+  ]
+}
+```
+
+**Errors**: `404` if the id doesn't exist (i.e. it has no revisions), `400` if the id isn't a
+valid UUID.
+
+```shell
+curl "http://localhost:8081/api/v1/document/revisions/a391f59e-f0fb-4d98-a36c-9f7706cebb8a"
+```
+
+---
+
 ## `GET /api/v1/document/content/{id}` — get a presigned download URL
 
 **Path parameters**: `id` — the document UUID. Optional trailing `version` — a specific past
@@ -418,6 +450,7 @@ curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f
 | `POST`   | `/api/v1/document/{id}`                       | Update to a new file version + presigned upload URL    |
 | `PUT`    | `/api/v1/document/{id}`                       | Update metadata, or metadata + direct file upload (new version) |
 | `GET`    | `/api/v1/document/metadata/{id}[/{version}]`  | Fetch document metadata (latest or a specific version) |
+| `GET`    | `/api/v1/document/revisions/{id}`             | Fetch full revision history (metadata only, all versions) |
 | `GET`    | `/api/v1/document/content/{id}[/{version}]`   | Presigned download URL (latest or a specific version)  |
 | `POST`   | `/api/v1/document/ask`                        | RAG question answering                                 |
 | `POST`   | `/api/v1/document/search`                     | Structured metadata search                              |

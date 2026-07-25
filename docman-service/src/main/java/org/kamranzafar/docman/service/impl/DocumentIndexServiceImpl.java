@@ -18,11 +18,9 @@ package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.exception.DocmanException;
-import org.kamranzafar.docman.mapper.DocumentMapper;
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.QueryConstants;
-import org.kamranzafar.docman.repository.DocumentMetadataRepository;
 import org.kamranzafar.docman.service.DocumentIndexService;
 import org.kamranzafar.docman.service.ObjectStoreService;
 import org.opensearch.client.json.JsonData;
@@ -38,6 +36,9 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -64,8 +65,6 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     private String indexName;
 
     @Autowired
-    private DocumentMetadataRepository documentMetadataRepository;
-    @Autowired
     private ObjectStoreService objectStoreService;
     @Autowired
     private TokenTextSplitter textSplitter;
@@ -74,7 +73,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     @Autowired
     private OpenSearchClient openSearchClient;
     @Autowired
-    private DocumentMapper documentMapper;
+    private MongoTemplate mongoTemplate;
 
     @Transactional
     @Override
@@ -110,9 +109,18 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             // cycle. Summary generation and classification query this document's own
             // chunks right after indexing, so they retry briefly instead - see
             // VectorStoreConsistency.
-            document.setStatus(DocumentStatus.INDEXED.name());
 
-            documentMetadataRepository.save(documentMapper.toEntity(document));
+            // Targeted field update, not a full document replace: `document` is a
+            // workflow-level snapshot captured when the workflow started, so a full
+            // save() here would clobber version/metadata/etc. if a user-driven
+            // updateDocument() call changed them concurrently while indexing (Tika +
+            // embedding) was still running - see DocumentServiceImpl.update for the
+            // same fix applied to the other workflow-driven write path.
+            mongoTemplate.updateFirst(
+                    org.springframework.data.mongodb.core.query.Query.query(
+                            Criteria.where("_id").is(document.getId())),
+                    Update.update("status", DocumentStatus.INDEXED.name()),
+                    org.kamranzafar.docman.model.Document.class);
         }
     }
 

@@ -24,6 +24,7 @@ spring:
     mongodb:
       host: localhost
       port: 27017
+      auto-index-creation: true
   servlet:
     multipart:
       max-file-size: 100MB

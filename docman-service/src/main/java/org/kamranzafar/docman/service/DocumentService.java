@@ -21,17 +21,34 @@ import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentRequest;
 import org.kamranzafar.docman.model.DocumentUpdateRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface DocumentService {
     DocumentDto create(DocumentRequest request);
 
     /**
-     * Internal/system update (workflow status transitions, summary and classification
-     * merges) - does not bump {@code version} or record a revision. User-driven updates
-     * go through {@link #updateDocument}.
+     * Internal/system status transition (workflow lifecycle steps) - a targeted field
+     * update that touches only {@code status}, so it can never clobber a concurrent
+     * user-driven change to any other field. Does not bump {@code version} or record a
+     * revision. User-driven updates go through {@link #updateDocument}.
      */
-    DocumentDto update(DocumentDto document);
+    void updateStatus(UUID id, String status);
+
+    /**
+     * Merges the AI-generated summary into the document's {@code metadata} map under a
+     * single {@code summary} key - a targeted field update that leaves every other
+     * metadata key untouched, so it can never clobber a concurrent user-driven metadata
+     * change made while summarization (an LLM call that can take up to minutes) was
+     * still running.
+     */
+    void mergeSummary(UUID id, String summary);
+
+    /**
+     * Internal/system {@code documentType} update (AI classification result) - a
+     * targeted field update, same rationale as {@link #updateStatus}.
+     */
+    void updateDocumentType(UUID id, String documentType);
 
     /**
      * User-driven metadata (and optionally file) update. Bumps {@code version}, records
@@ -52,4 +69,10 @@ public interface DocumentService {
      * Looks up a specific past version's metadata snapshot from the revision history.
      */
     DocumentDto findMetadata(UUID id, int version);
+
+    /**
+     * Returns every recorded version's metadata snapshot from the revision history,
+     * oldest first. Content is never included - each snapshot is metadata only.
+     */
+    List<DocumentDto> findRevisions(UUID id);
 }

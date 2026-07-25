@@ -1,0 +1,32 @@
+meta {
+  name: Get Revision History
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/document/revisions/{{documentId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns every recorded version's metadata snapshot, oldest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.documents.length).to.be.at.least(1);
+    expect(res.body.documents[0].version).to.equal(1);
+    expect(res.body.documents[0].status).to.equal(null);
+  });
+}
+
+docs {
+  Every version's metadata snapshot from `document_revisions`, oldest first - the same
+  per-version shape as "Get Metadata - Specific Version" (`status` is intentionally `null`,
+  it's a live-workflow concept, not part of a point-in-time snapshot), but for the whole
+  history in one call instead of one version at a time. Content is never included.
+}
