@@ -35,6 +35,8 @@ public interface DocumentActivities {
     @ActivityMethod
     void index(Document document);
     @ActivityMethod
+    boolean chunksIndexed(Document document);
+    @ActivityMethod
     String generateSummary(Document document);
     @ActivityMethod
     String classifyDocument(Document document);

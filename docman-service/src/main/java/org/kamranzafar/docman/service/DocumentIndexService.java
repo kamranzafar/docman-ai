@@ -29,4 +29,12 @@ public interface DocumentIndexService {
      * already-indexed vector store chunks, without touching their embeddings or content.
      */
     void updateMetadata(DocumentDto document);
+
+    /**
+     * Cheap existence check for whether this document's chunks have become searchable
+     * yet. Indexing doesn't force a synchronous OpenSearch refresh (see {@code index}),
+     * so callers that need to know when a just-indexed document's own chunks are visible
+     * poll this rather than assuming it's true the instant {@code index} returns.
+     */
+    boolean isIndexed(DocumentDto document);
 }

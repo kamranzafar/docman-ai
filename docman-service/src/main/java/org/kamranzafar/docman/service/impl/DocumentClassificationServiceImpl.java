@@ -72,9 +72,12 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();
 
-        // Cheap existence check (with brief retry) before the expensive LLM call,
-        // since indexing doesn't force a refresh - see VectorStoreConsistency.
-        List<org.springframework.ai.document.Document> existing = VectorStoreConsistency.awaitChunks(vectorStore,
+        // Cheap existence check before the expensive LLM call. The workflow already
+        // waits for this document's chunks to become visible in the vector store
+        // before invoking this activity (see DocumentWorkflowImpl), so no retry is
+        // needed here - a still-empty result means the wait window elapsed, not
+        // that this call raced the indexing write.
+        List<org.springframework.ai.document.Document> existing = vectorStore.similaritySearch(
                 SearchRequest.builder().filterExpression(documentFilter).topK(1).build());
 
         if (existing.isEmpty()) {

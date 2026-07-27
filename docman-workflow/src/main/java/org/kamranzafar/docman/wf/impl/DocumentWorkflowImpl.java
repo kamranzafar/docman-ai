@@ -41,12 +41,22 @@ import java.util.function.Supplier;
 @Slf4j
 @Service
 @WorkflowImpl(taskQueues = "documents")
-public class DocumentWorkflowImpl implements DocumentWorkflow {
+public class
+DocumentWorkflowImpl implements DocumentWorkflow {
     private static final Duration UPLOAD_POLL_INTERVAL = Duration.ofSeconds(5);
     private static final Duration MAX_UPLOAD_WAIT = Duration.ofMinutes(15);
 
+    // Indexing doesn't force a synchronous OpenSearch refresh (see
+    // DocumentIndexServiceImpl.index), so a document's chunks aren't guaranteed
+    // searchable the instant the index activity returns. Poll briefly for chunks
+    // to become visible before starting summary/classification, which both query
+    // this document's own chunks.
+    private static final Duration CHUNK_VISIBILITY_POLL_INTERVAL = Duration.ofMillis(300);
+    private static final int MAX_CHUNK_VISIBILITY_ATTEMPTS = 5;
+
     private final Supplier<DocumentActivities> activities;
     private final Supplier<DocumentActivities> uploadCheckActivities;
+    private final Supplier<DocumentActivities> chunkCheckActivities;
     private final Supplier<DocumentActivities> summaryActivities;
     private final Supplier<DocumentActivities> classificationActivities;
 
@@ -65,6 +75,18 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
         // gets its own short-timeout stub rather than parking a worker thread for
         // the entire upload wait window.
         this.uploadCheckActivities = () -> Workflow.newActivityStub(
+                DocumentActivities.class,
+                ActivityOptions.newBuilder()
+                        .setStartToCloseTimeout(Duration.ofSeconds(10))
+                        .setRetryOptions(RetryOptions.newBuilder()
+                                .setMaximumAttempts(3)
+                                .setInitialInterval(Duration.ofSeconds(1))
+                                .build())
+                        .build()
+        );
+        // Chunk visibility is a single fast existence check, same reasoning as
+        // checkUploadStatus above.
+        this.chunkCheckActivities = () -> Workflow.newActivityStub(
                 DocumentActivities.class,
                 ActivityOptions.newBuilder()
                         .setStartToCloseTimeout(Duration.ofSeconds(10))
@@ -128,6 +150,9 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
             // Summary and classification both query the vector store for this
             // document's own chunks, so neither can start until indexing has written
             // them - they run concurrently with each other instead of with indexing.
+            // Wait once, here, rather than each activity retrying its own query.
+            waitForChunksIndexed(document);
+
             Promise<String> summaryPromise = Async.function(() -> summaryActivities.get().generateSummary(document));
             Promise<String> classificationPromise = Async.function(() -> classificationActivities.get().classifyDocument(document));
 
@@ -186,5 +211,25 @@ public class DocumentWorkflowImpl implements DocumentWorkflow {
 
         throw ApplicationFailure.newNonRetryableFailure(
                 "Document content was not uploaded within " + MAX_UPLOAD_WAIT, "UploadTimeout");
+    }
+
+    // Gives up quietly rather than failing the workflow: summary generation and
+    // classification already treat "no chunks found" as a normal, gracefully
+    // handled outcome (see DocumentSummaryServiceImpl/DocumentClassificationServiceImpl),
+    // so a still-empty result here just means that outcome, not an error.
+    private void waitForChunksIndexed(Document document) {
+        DocumentActivities chunkCheckActivity = chunkCheckActivities.get();
+
+        for (int attempt = 1; attempt <= MAX_CHUNK_VISIBILITY_ATTEMPTS; attempt++) {
+            if (chunkCheckActivity.chunksIndexed(document)) {
+                return;
+            }
+            if (attempt < MAX_CHUNK_VISIBILITY_ATTEMPTS) {
+                Workflow.sleep(CHUNK_VISIBILITY_POLL_INTERVAL);
+            }
+        }
+
+        log.debug("Vector store chunks still not visible for document {} after {} attempts",
+                document.getId(), MAX_CHUNK_VISIBILITY_ATTEMPTS);
     }
 }

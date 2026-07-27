@@ -82,6 +82,11 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     }
 
     @Override
+    public boolean chunksIndexed(Document document) {
+        return documentIndexService.isIndexed(documentMapper.toDto(document));
+    }
+
+    @Override
     public String generateSummary(Document document) {
         return documentSummaryService.generateSummary(documentMapper.toDto(document));
     }
