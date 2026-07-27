@@ -133,6 +133,10 @@ sequenceDiagram
     Act->>Kafka: publish {status: INGESTED, documentId, timestamp}
     WF->>Act: index(document)
     Act->>Idx: extract, chunk, embed, index
+    loop until chunks visible (durable timer, no worker thread held)
+        WF->>Act: chunksIndexed()
+        Act->>Idx: cheap topK(1) existence check
+    end
     par concurrently
         WF->>Act: generateSummary(document)
         Act->>Sum: ask Ollama for a summary, grounded in this document's own indexed chunks
@@ -173,7 +177,9 @@ Key design points:
 - **Summarization and classification both run only after indexing completes**, since both query
   the chunks indexing just wrote to the vector store rather than re-reading raw content from
   MinIO — see [Document Summarization & Classification](#document-summarization--classification).
-  They run concurrently with *each other*, but neither can start until indexing has finished.
+  They run concurrently with *each other*, but neither can start until indexing has finished *and*
+  the workflow's `chunksIndexed` poll (same durable-timer pattern as the upload wait) confirms the
+  chunks are actually visible in OpenSearch.
 - **Every workflow-driven Mongo write is a targeted `$set` on the one field it owns**
   (`updateStatus`/`mergeSummary`/`updateDocumentType`, plus the outer catch block's `updateStatus`
   on failure), never a full document replace. The `document` object the workflow carries is a
@@ -314,19 +320,20 @@ and re-running Tika a second time:
   "invoices" vs. "statements") on repeated runs of identical content at the app's configured
   temperature of `1`.
 
-**Both retry briefly instead of forcing a refresh.** OpenSearch's default near-real-time refresh
-means newly-added chunks aren't guaranteed searchable the instant `vectorStore.add()` returns —
-there can be up to a second (or more, under load) before a background refresh cycle makes them
-visible. Indexing deliberately does *not* force a synchronous refresh after adding chunks: at the
-ingestion rates this app is meant to handle (tens of documents/second), that would turn every single
-document into its own Lucene segment flush instead of letting writes batch into the normal refresh
-cycle — trading a small, bounded per-document wait for a much larger, sustained indexing-throughput
-cost. Instead, `VectorStoreConsistency.awaitChunks()` (`docman-service`) wraps the query both AI
-steps make with a short bounded retry (up to 5 attempts, 300ms apart — so at most ~1.2s), which
-comfortably covers the default refresh interval. Classification does a cheap `topK(1)` existence
-check with this retry before running its (expensive) LLM call, so a document with genuinely no
-extractable text short-circuits straight to `unknown` instead of asking the model to classify
-nothing; summarization's own retrieval reuses the same helper directly.
+**The workflow waits once for chunk visibility instead of forcing a refresh.** OpenSearch's default
+near-real-time refresh means newly-added chunks aren't guaranteed searchable the instant
+`vectorStore.add()` returns — there can be up to a second (or more, under load) before a background
+refresh cycle makes them visible. Indexing deliberately does *not* force a synchronous refresh after
+adding chunks: at the ingestion rates this app is meant to handle (tens of documents/second), that
+would turn every single document into its own Lucene segment flush instead of letting writes batch
+into the normal refresh cycle — trading a small, bounded per-document wait for a much larger,
+sustained indexing-throughput cost. Instead, the workflow polls a `chunksIndexed` activity
+(`DocumentIndexService.isIndexed`, a cheap `topK(1)` existence check) the same way it waits for the
+upload — a durable-timer loop, up to 5 attempts, 300ms apart (`Workflow.sleep`, no worker thread
+held), so at most ~1.2s — once, before starting summary and classification concurrently, rather than
+each AI step independently retrying its own query. If the wait window elapses with no chunks found
+(e.g. the file had no extractable text), both AI steps just see an empty result and handle it as they
+already did — classification falls back to `unknown`, summarization returns `null` and is skipped.
 
 Once a category is decided, the workflow persists `documentType` on the `Document` record and
 publishes a `CLASSIFIED` Kafka event — separate from the `INDEXED` event, since classification
