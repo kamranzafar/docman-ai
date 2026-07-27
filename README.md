@@ -58,7 +58,6 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit toge
 | Workflow orchestration      | Temporal                             |
 | Eventing                    | Kafka                                |
 | AI inference                | Ollama (`llama3.1`, `nomic-embed-text`) |
-| DTO ↔ entity mapping        | MapStruct                            |
 | Build                        | Maven (multi-module)                |
 
 Full details, including how the five Maven modules divide responsibilities, are in
