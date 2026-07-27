@@ -65,7 +65,11 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();
 
-        List<org.springframework.ai.document.Document> chunks = VectorStoreConsistency.awaitChunks(vectorStore,
+        // The workflow waits for this document's chunks to become visible in the
+        // vector store before invoking this activity (see DocumentWorkflowImpl),
+        // so no retry is needed here - a still-empty result means the wait
+        // window elapsed, not that this call raced the indexing write.
+        List<org.springframework.ai.document.Document> chunks = vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(document.getName())
                         .filterExpression(documentFilter)

@@ -30,6 +30,7 @@ import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.UpdateByQueryResponse;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
@@ -106,9 +107,9 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             // Deliberately not forcing a refresh here: at high ingestion rates that
             // would turn every single document's index() call into its own Lucene
             // segment flush instead of letting writes batch into the normal refresh
-            // cycle. Summary generation and classification query this document's own
-            // chunks right after indexing, so they retry briefly instead - see
-            // VectorStoreConsistency.
+            // cycle. The workflow polls isIndexed() and waits for chunks to become
+            // visible before running summary generation and classification - see
+            // DocumentWorkflowImpl.waitForChunksIndexed.
 
             // Targeted field update, not a full document replace: `document` is a
             // workflow-level snapshot captured when the workflow started, so a full
@@ -170,5 +171,19 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
         vectorStore.delete(filter);
         log.info("Deleted vector store entries for document {}", document.getId());
+    }
+
+    @Override
+    public boolean isIndexed(DocumentDto document) {
+        Filter.Expression filter = new FilterExpressionBuilder()
+                .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
+                .build();
+
+        return !vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .filterExpression(filter)
+                        .topK(1)
+                        .build())
+                .isEmpty();
     }
 }
