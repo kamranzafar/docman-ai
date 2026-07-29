@@ -22,7 +22,9 @@ without blocking the client that uploaded the document.
   Kafka event once done; a failed or slow summary/classification never blocks the document from
   reaching `INDEXED`
 - **Vector search / RAG**: ask natural-language questions and get answers grounded in the indexed
-  document content (`nomic-embed-text` embeddings, OpenSearch as the vector store, `llama3.1` chat)
+  document content (OpenSearch as the vector store; chat and embedding models are vendor-agnostic
+  via Spring AI — `nomic-embed-text`/`llama3.1` via Ollama by default, swappable for OpenAI's
+  `text-embedding-3-small`/`gpt-5.4-mini` via the `prod` profile, config-only, no code change)
 - **Structured metadata search**: filter documents by arbitrary metadata fields (including document
   type and free-form tags) without needing to know OpenSearch's query syntax
 - **Kafka-triggered vector store metadata sync**: every document metadata update (summary results,
@@ -57,7 +59,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit toge
 | Vector store                | OpenSearch                          |
 | Workflow orchestration      | Temporal                             |
 | Eventing                    | Kafka                                |
-| AI inference                | Ollama (`llama3.1`, `nomic-embed-text`) |
+| AI inference                | Spring AI, vendor-agnostic — Ollama by default (`llama3.1`, `nomic-embed-text`), OpenAI (`gpt-5.4-mini`, `text-embedding-3-small`) via the `prod` profile |
 | Build                        | Maven (multi-module)                |
 
 Full details, including how the five Maven modules divide responsibilities, are in

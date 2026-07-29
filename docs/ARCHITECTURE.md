@@ -19,7 +19,7 @@ flowchart LR
     DocmanService --> Mongo
     DocmanService --> MinIO
     DocmanService -->|embed + index| OpenSearch[(OpenSearch)]
-    DocmanService -->|chat + embeddings| Ollama[(Ollama)]
+    DocmanService -->|chat + embeddings| Model[(Ollama / OpenAI)]
     Workflow -->|events| Kafka[(Kafka)]
 ```
 
@@ -34,10 +34,10 @@ flowchart LR
 | Workflow orchestration     | Temporal                          | Durable, retryable ingestion pipeline                                |
 | Eventing                   | Kafka                             | JSON lifecycle notifications (`DocumentNotification`) for every ingestion stage, plus a metadata-sync trigger topic |
 | Text extraction              | Apache Tika (via Spring AI)        | Extracts text from PDF/DOC/TXT/etc.                                  |
-| Embeddings                    | Ollama `nomic-embed-text`          | 768-dimension vectors for chunked document text                      |
-| Chat / RAG answers                | Ollama `llama3.1`                  | Answers questions grounded in indexed document content               |
-| Document summarization            | Ollama `llama3.1` + OpenSearch      | Generates a 2-3 sentence summary via retrieval over the document's own indexed chunks |
-| Document classification         | Ollama `llama3.1` (temperature `0`) + OpenSearch | Assigns `documentType` from a fixed category set, via retrieval over the document's own indexed chunks |
+| Model provider                  | Spring AI, vendor-agnostic         | `ChatClient`/`EmbeddingModel`/`VectorStore` — swappable via `spring.ai.model.chat` / `spring.ai.model.embedding`, not code. Default profile: Ollama (`llama3.1` chat, `nomic-embed-text` embeddings, 768-dim). `prod` profile: OpenAI (`gpt-5.4-mini` chat, `text-embedding-3-small` embeddings, 1536-dim, separate index) — see [`docs/SETUP.md`](SETUP.md#configuration-reference) |
+| Chat / RAG answers                | Configured chat model (`llama3.1` default / `gpt-5.4-mini` in `prod`) | Answers questions grounded in indexed document content               |
+| Document summarization            | Configured chat model + OpenSearch      | Generates a 2-3 sentence summary via retrieval over the document's own indexed chunks |
+| Document classification         | Configured chat model (temperature `0`) + OpenSearch | Assigns `documentType` from a fixed category set, via retrieval over the document's own indexed chunks |
 | DTO ↔ entity mapping              | MapStruct                          | Generates the `Document` ⇄ `DocumentDto`/`DocumentRequest` mappers at compile time |
 
 ## Module Structure
@@ -139,10 +139,10 @@ sequenceDiagram
     end
     par concurrently
         WF->>Act: generateSummary(document)
-        Act->>Sum: ask Ollama for a summary, grounded in this document's own indexed chunks
+        Act->>Sum: ask configured chat model for a summary, grounded in this document's own indexed chunks
     and
         WF->>Act: classifyDocument(document)
-        Act->>Cls: ask Ollama for documentType, grounded in this document's own indexed chunks
+        Act->>Cls: ask configured chat model for documentType, grounded in this document's own indexed chunks
     end
     alt summary succeeded
         WF->>Act: mergeSummary(summary)
@@ -305,20 +305,32 @@ and re-running Tika a second time:
   filter, the same metadata key `DocumentIndexService.deleteIndex` uses to clean them up, with a
   generous `topK` so the filter — not similarity ranking — is what bounds the result set), sorts
   them back into original reading order using their `chunk_index` metadata (vector search returns
-  chunks in similarity order, not document order), reassembles the text, and asks `llama3.1` for a
-  2-3 sentence summary. If no chunks come back (e.g. the file had no extractable text), it returns
-  `null` and the workflow skips the summary rather than storing a hallucinated one.
+  chunks in similarity order, not document order), reassembles the text, and asks the configured
+  chat model (`llama3.1` by default, `gpt-5.4-mini` in `prod` — see below) for a 2-3 sentence
+  summary. If no chunks come back (e.g. the file had no extractable text), it returns `null` and the
+  workflow skips the summary rather than storing a hallucinated one.
 - **`DocumentClassificationServiceImpl`** runs a `QuestionAnswerAdvisor`-based RAG query scoped the
-  same way, asking `llama3.1` to pick exactly one of a fixed set of categories (`DocumentType`, in
-  `docman-domain`): `statements`, `invoices`, `policyDocuments`, `complianceCertificates`,
-  `insuranceDocuments`, `contracts` — or `unknown` if the document doesn't clearly match any of
-  them (also the fallback if the model's response doesn't match a known label, or if the activity
-  throws). It runs at `temperature 0` (unlike the `1` used for RAG answers and summaries, configured
-  via `spring.ai.ollama.chat.options.temperature` in `application.yaml`) via a per-call
-  `OllamaChatOptions` override passed directly in code, so the same document consistently gets the
-  same category — a single-word classification otherwise drifts between similar categories (e.g.
-  "invoices" vs. "statements") on repeated runs of identical content at the app's configured
-  temperature of `1`.
+  same way, asking the configured chat model to pick exactly one of a fixed set of categories
+  (`DocumentType`, in `docman-domain`): `statements`, `invoices`, `policyDocuments`,
+  `complianceCertificates`, `insuranceDocuments`, `contracts` — or `unknown` if the document doesn't
+  clearly match any of them (also the fallback if the model's response doesn't match a known label,
+  or if the activity throws). It runs at `temperature 0` (unlike the `1` used for RAG answers and
+  summaries, configured via `spring.ai.<ollama|openai>.chat.options.temperature` in
+  `application*.yaml`) via a per-call portable `ChatOptions` override passed directly in code — not
+  a provider-specific options class, so this works unchanged regardless of which model provider is
+  active — so the same document consistently gets the same category — a single-word classification
+  otherwise drifts between similar categories (e.g. "invoices" vs. "statements") on repeated runs of
+  identical content at the app's configured temperature of `1`.
+
+**Model provider is vendor-agnostic and profile-switched.** `docman-service` only depends on
+Spring AI's portable APIs (`ChatClient`, `ChatOptions`, `VectorStore`) — no provider-specific
+classes. `docman-api` bundles both the Ollama and OpenAI Spring AI starters; which one actually
+wires up the `ChatModel`/`EmbeddingModel` beans is chosen at config time via
+`spring.ai.model.chat` / `spring.ai.model.embedding` (`ollama` in the default `application.yaml`,
+`openai` in `application-prod.yaml`), so switching providers is a config change, not a code change.
+See [`docs/SETUP.md`](SETUP.md#configuration-reference) for the `prod` profile's OpenAI
+configuration, including why it uses a separate OpenSearch index (different embedding
+dimensionality).
 
 **The workflow waits once for chunk visibility instead of forcing a refresh.** OpenSearch's default
 near-real-time refresh means newly-added chunks aren't guaranteed searchable the instant

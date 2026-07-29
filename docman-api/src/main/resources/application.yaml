@@ -42,6 +42,13 @@ spring:
           truststore:
             certificate: classpath:opensearch-root-ca.pem
   ai:
+    # Selects which model provider's autoconfiguration activates. Both Ollama and
+    # OpenAI starters are always on the classpath (see docman-api/pom.xml) so that
+    # switching provider is a config-only change (e.g. the "prod" profile flips
+    # these to "openai") rather than a code or dependency change.
+    model:
+      chat: ollama
+      embedding: ollama
     vectorstore:
       opensearch:
         uris: https://localhost:9200
