@@ -179,8 +179,13 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
                 .eq(QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY, document.getId().toString())
                 .build();
 
+        // query is otherwise "" (SearchRequest's default) - the filterExpression above is
+        // what actually scopes this to one document, but some embedding models (e.g.
+        // OpenAI's, unlike Ollama's) reject an empty-string embedding input outright, so
+        // this needs any non-empty text.
         return !vectorStore.similaritySearch(
                 SearchRequest.builder()
+                        .query(document.getName())
                         .filterExpression(filter)
                         .topK(1)
                         .build())

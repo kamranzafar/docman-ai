@@ -134,16 +134,50 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `spring.data.mongodb.host` / `.port`                            | `localhost` / `27017`             | MongoDB connection |
 | `spring.temporal.connection.target`                               | `localhost:7233`                  | Temporal server gRPC endpoint |
 | `spring.ai.vectorstore.opensearch.uris`                             | `https://localhost:9200`          | OpenSearch endpoint |
-| `spring.ai.vectorstore.opensearch.dimensions`                        | `768`                             | Must match the embedding model's output size (`nomic-embed-text` = 768) |
+| `spring.ai.vectorstore.opensearch.dimensions`                        | `768`                             | Must match the active embedding model's output size (`nomic-embed-text` = 768; `text-embedding-3-small` = 1536 in the `prod` profile) |
+| `spring.ai.model.chat` / `spring.ai.model.embedding`                    | `ollama` / `ollama`               | Selects which bundled Spring AI starter (Ollama or OpenAI) actually wires up the `ChatModel`/`EmbeddingModel` beans — see [Production profile (OpenAI)](#production-profile-openai) |
 | `spring.ai.ollama.base-url`                                            | `http://localhost:11434/`         | Ollama endpoint |
 | `spring.ai.ollama.embedding.options.model`                               | `nomic-embed-text`                | Embedding model |
 | `spring.ai.ollama.chat.model`                                               | `llama3.1`                        | Chat model, used for RAG answers, summarization, and classification |
 | `spring.ai.ollama.chat.options.timeout`                                       | `600s`                            | Max time for a single Ollama chat call |
-| `spring.ai.ollama.chat.options.temperature`                                     | `1`                               | Default sampling temperature for RAG answers and summaries. Document classification overrides this to `0` per-call in code regardless (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) |
+| `spring.ai.ollama.chat.options.temperature`                                     | `1`                               | Default sampling temperature for RAG answers and summaries. Document classification overrides this to `0` per-call in code regardless, via a portable `ChatOptions` override that works with any provider (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-summarization--classification)) |
 | `spring.servlet.multipart.max-file-size` / `.max-request-size`                  | `100MB`                           | Direct (`PUT /api/v1/document`) upload size cap |
 | `kafka.address`                                                                    | `localhost:9092`                  | Kafka bootstrap server |
 | `kafka.topic`                                                                        | `documents`                       | Lifecycle notification topic |
 | `kafka.metadata-sync-topic`                                                            | `document-metadata-sync`          | Trigger topic for syncing vector store chunk metadata on every `DocumentService.update()` (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) |
+
+## Production profile (OpenAI)
+
+`docman-api` bundles both the Ollama and OpenAI Spring AI starters, and the runnable jar doesn't
+need rebuilding to switch between them — `spring.ai.model.chat` / `spring.ai.model.embedding`
+(default: `ollama`) decide which starter's autoconfiguration actually wires up the
+`ChatModel`/`EmbeddingModel` beans. The `prod` profile
+(`docman-api/src/main/resources/application-prod.yaml`) flips both to `openai` and configures:
+
+- `spring.ai.openai.api-key`: read from the `OPENAI_API_KEY` environment variable — set this before
+  starting the app, it is not checked into any config file
+- `spring.ai.openai.chat.options.model: gpt-5.4-mini` — replaces `llama3.1` for RAG answers,
+  summarization, and classification
+- `spring.ai.openai.embedding.options.model: text-embedding-3-small` — replaces `nomic-embed-text`
+  for chunk embeddings
+- `spring.ai.vectorstore.opensearch.index-name: docman-vector-index-openai` and `.dimensions: 1536`
+  — a **separate** OpenSearch index from the default `docman-vector-index` (768-dim), since
+  OpenSearch won't let you change an existing field's `knn_vector` dimension in place. Documents
+  ingested under the default profile are not visible through this index; either re-run ingestion
+  for existing documents against the `prod` profile, or keep the two profiles pointed at genuinely
+  separate environments.
+
+Run with the profile active:
+
+```shell
+export OPENAI_API_KEY=sk-...
+mvn -pl docman-api -am spring-boot:run -Dspring-boot.run.profiles=prod
+# or
+java -jar docman-api/target/docman-api-1.0-SNAPSHOT.jar --spring.profiles.active=prod
+```
+
+Everything else (MinIO, MongoDB, Temporal, Kafka, the OpenSearch connection itself) is unaffected
+by this profile — only the model provider and vector index change.
 
 ## Deployment notes
 
@@ -187,3 +221,13 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 - **Mongo repository not picking up documents**: confirm `Application`'s
   `@EnableMongoRepositories(basePackages = "org.kamranzafar.docman.repository")` matches wherever
   `DocumentMetadataRepository` actually lives — this has drifted before during refactors.
+- **Every OpenAI chat call (`prod` profile) fails with `JsonEOFException` / "Unexpected
+  end-of-input" after the response's opening `{`**: this was hit and root-caused during initial
+  end-to-end testing of the `prod` profile in this environment — a gzip-encoded response from
+  OpenAI's API was getting truncated somewhere in the RestClient/Micrometer-observation stack
+  before Jackson could parse it, even though the exact same request succeeds when made with a
+  bare JDK `HttpClient` or `curl`. The fix already in place is the `RestClient.Builder` bean in
+  `DocmanConfig` that forces `Accept-Encoding: identity` (no compression) for all outbound model
+  calls. If you see this error again after changing HTTP client dependencies, check that this bean
+  is still being picked up (Spring AI's model autoconfigurations use whatever `RestClient.Builder`
+  bean is in context, see the comment on that bean for more detail).

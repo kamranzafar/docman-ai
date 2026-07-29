@@ -23,7 +23,7 @@ import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentClassificationService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
@@ -77,8 +77,13 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
         // before invoking this activity (see DocumentWorkflowImpl), so no retry is
         // needed here - a still-empty result means the wait window elapsed, not
         // that this call raced the indexing write.
+        //
+        // query is set to the document's own name rather than left as SearchRequest's
+        // default "" - the filterExpression is what actually scopes this to one
+        // document, but some embedding models (e.g. OpenAI's, unlike Ollama's) reject
+        // an empty-string embedding input outright.
         List<org.springframework.ai.document.Document> existing = vectorStore.similaritySearch(
-                SearchRequest.builder().filterExpression(documentFilter).topK(1).build());
+                SearchRequest.builder().query(document.getName()).filterExpression(documentFilter).topK(1).build());
 
         if (existing.isEmpty()) {
             log.info("No indexed chunks for document {}, defaulting classification to unknown", document.getId());
@@ -91,7 +96,7 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().filterExpression(documentFilter).build())
                         .build())
-                .options(OllamaChatOptions.builder().temperature(CLASSIFICATION_TEMPERATURE).build())
+                .options(ChatOptions.builder().temperature(CLASSIFICATION_TEMPERATURE).build())
                 .user(String.format(CLASSIFICATION_QUESTION, categories))
                 .call()
                 .content();
