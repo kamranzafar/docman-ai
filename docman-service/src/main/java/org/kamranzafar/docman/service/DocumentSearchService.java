@@ -16,10 +16,13 @@
 
 package org.kamranzafar.docman.service;
 
+import org.kamranzafar.docman.model.HybridSearchResult;
+
 import java.util.List;
 import java.util.Map;
 
 public interface DocumentSearchService {
     String vectorSearch(String question);
     List<Object> lexicalSearch(Map<String, Object> filters);
+    List<HybridSearchResult> hybridSearch(String query, Map<String, Object> filters);
 }

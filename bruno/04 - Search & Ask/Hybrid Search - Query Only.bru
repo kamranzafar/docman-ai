@@ -1,0 +1,44 @@
+meta {
+  name: Hybrid Search - Query Only
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search/hybrid
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "widget invoice payment due"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns fused results ranked by combined score", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body).to.be.an("array");
+    if (res.body.length > 1) {
+      expect(res.body[0].score).to.be.at.least(res.body[1].score);
+    }
+  });
+}
+
+docs {
+  Combines vector similarity search (embeddings via the active `EmbeddingModel`) and
+  OpenSearch BM25 search against the `content` field, fusing the two ranked lists with
+  Reciprocal Rank Fusion (k=60). A document found by both engines outscores one found by
+  only one, even if neither engine alone ranked it first. Collapsed to one hit per
+  document like `/search`.
+}

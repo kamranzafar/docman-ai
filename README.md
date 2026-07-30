@@ -27,6 +27,9 @@ without blocking the client that uploaded the document.
   `text-embedding-3-small`/`gpt-5.4-mini` via the `prod` profile, config-only, no code change)
 - **Structured metadata search**: filter documents by arbitrary metadata fields (including document
   type and free-form tags) without needing to know OpenSearch's query syntax
+- **Hybrid search**: combines vector similarity search and OpenSearch BM25 lexical search over the
+  same free-text query, fusing the two ranked lists with Reciprocal Rank Fusion so documents either
+  engine alone would rank low, but both agree on, surface near the top
 - **Kafka-triggered vector store metadata sync**: every document metadata update (summary results,
   classification, or future direct edits) publishes to a Kafka topic that a consumer picks up to
   patch the corresponding OpenSearch chunks' metadata in place — no re-embedding, no re-reading the

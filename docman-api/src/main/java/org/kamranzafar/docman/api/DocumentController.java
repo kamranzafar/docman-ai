@@ -203,6 +203,18 @@ public class DocumentController {
         return ResponseEntity.ok(documentSearchService.lexicalSearch(request.getFilters()));
     }
 
+    @PostMapping("/search/hybrid")
+    public ResponseEntity<?> hybridSearch(@RequestBody DocumentSearchRequest request) {
+        if (!StringUtils.hasText(request.getQuery())) {
+            throw new DocmanException("Query is mandatory");
+        }
+        if (request.getFilters() != null && request.getFilters().size() > QueryConstants.QUERY_MAX_FILTERS) {
+            throw new DocmanException("Filters exceed maximum count of " + QueryConstants.QUERY_MAX_FILTERS);
+        }
+
+        return ResponseEntity.ok(documentSearchService.hybridSearch(request.getQuery(), request.getFilters()));
+    }
+
     @GetMapping({"/metadata/{id}", "/metadata/{id}/{version}"})
     public ResponseEntity<?> getMetadata(@PathVariable String id,
                                           @PathVariable(required = false) Integer version) {
