@@ -1,0 +1,42 @@
+meta {
+  name: Hybrid Search - Query With Filters
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search/hybrid
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "consulting services late fee",
+    "filters": {
+      "documentType": "invoices"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("narrows fused results to documents matching the filters", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body).to.be.an("array");
+  });
+}
+
+docs {
+  `filters` (optional, same shape as `/search`) are applied as hard AND constraints on
+  both the vector search (metadata filter expression) and the OpenSearch search
+  (non-scoring filter clause) before fusion - not just a lexical hint.
+}

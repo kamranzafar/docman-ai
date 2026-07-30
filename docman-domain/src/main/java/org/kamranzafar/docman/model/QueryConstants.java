@@ -24,4 +24,11 @@ public interface QueryConstants {
     String QUERY_SOURCE_INCLUDE = "metadata";
     String QUERY_METADATA_FIELD_PREFIX = "metadata.";
     int QUERY_MAX_FILTERS = 10;
+    String CONTENT_FIELD = "content";
+    int HYBRID_SEARCH_TOP_K = 10;
+    // Reciprocal Rank Fusion constant - dampens the influence of low-ranked hits from
+    // either leg so one engine returning a huge, loosely-relevant result set can't drown
+    // out a small, highly relevant result set from the other. 60 is the value used in the
+    // original RRF paper (Cormack et al.) and is the de facto standard default.
+    int HYBRID_SEARCH_RRF_RANK_CONSTANT = 60;
 }

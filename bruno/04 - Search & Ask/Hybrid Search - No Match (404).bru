@@ -1,0 +1,42 @@
+meta {
+  name: Hybrid Search - No Match (404)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search/hybrid
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "invoice payment",
+    "filters": {
+      "vendor": "nonexistent-vendor-zzz"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 404 when filters eliminate every candidate from both legs", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.body.detail).to.equal("No matching document(s) found");
+  });
+}
+
+docs {
+  Because filters are applied to the vector leg too (not just the lexical leg), an
+  impossible filter zeroes out both engines - hybrid search doesn't fall back to
+  unfiltered semantic matches.
+}

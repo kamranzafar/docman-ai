@@ -65,7 +65,7 @@ body:
 
 | Status | When |
 |--------|------|
-| 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question) |
+| 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question, missing hybrid search query) |
 | 404    | Document id doesn't exist |
 | 409    | An update (`POST`/`PUT /api/v1/document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
 | 500    | Unhandled server error |
@@ -418,6 +418,63 @@ curl -X POST http://localhost:8081/api/v1/document/search \
 
 ---
 
+## `POST /api/v1/document/search/hybrid` — hybrid (semantic + lexical) search
+
+Combines vector similarity search (embeddings) and OpenSearch BM25 search against the raw chunk
+`content` — unlike `/search`, this one queries actual document text, not just the `metadata`
+subtree — fusing the two ranked lists with Reciprocal Rank Fusion (RRF, k=60). A document that
+both engines surface ranks above one that only a single engine found, even if neither ranked it
+first individually. Useful when a query mixes exact terms (an invoice number, a name) with
+conceptual phrasing that a pure keyword search would miss.
+
+**Request body** (`DocumentSearchRequest`):
+
+```json
+{
+  "query": "widget invoice payment due",
+  "filters": { "documentType": "invoice" }
+}
+```
+
+| Field     | Required | Notes |
+|-----------|----------|-------|
+| `query`   | yes      | Free-text query driving both the vector search and the BM25 `content` match |
+| `filters` | no       | Same shape and rules as `/search`'s `filters` (max 10 entries) — applied as a hard AND constraint to **both** legs before fusion, not just the lexical one |
+
+**Response** `200 OK`: a list of matching chunks' metadata with a fused RRF score, sorted
+descending, collapsed by parent document like `/search`:
+
+```json
+[
+  {
+    "metadata": {
+      "chunk_index": 0,
+      "documentType": "invoice",
+      "vendor": "acme",
+      "parent_document_id": "a391f59e-f0fb-4d98-a36c-9f7706cebb8a",
+      "total_chunks": 3
+    },
+    "score": 0.032786885245901644
+  }
+]
+```
+
+The `score` is the summed RRF contribution (`1 / (60 + rank)` per leg it appears in) — not a
+similarity or relevance percentage, and not comparable across different queries. It's only
+meaningful for ordering results within a single response.
+
+**Errors**: `400` if `query` is missing/blank, or if `filters` has more than 10 entries. `404` if
+nothing matches in either leg (e.g. `filters` eliminates every candidate from both the vector and
+lexical searches).
+
+```shell
+curl -X POST http://localhost:8081/api/v1/document/search/hybrid \
+  -H "Content-Type: application/json" \
+  -d '{"query":"widget invoice payment due","filters":{"documentType":"invoice"}}'
+```
+
+---
+
 ## `DELETE /api/v1/document/{id}` — delete a document
 
 Tears down everything associated with a document, **all versions included**:
@@ -454,6 +511,7 @@ curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f
 | `GET`    | `/api/v1/document/content/{id}[/{version}]`   | Presigned download URL (latest or a specific version)  |
 | `POST`   | `/api/v1/document/ask`                        | RAG question answering                                 |
 | `POST`   | `/api/v1/document/search`                     | Structured metadata search                              |
+| `POST`   | `/api/v1/document/search/hybrid`              | Hybrid search (semantic + lexical, RRF-fused)           |
 | `DELETE` | `/api/v1/document/{id}`                       | Delete document, all versions (full cleanup)           |
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/

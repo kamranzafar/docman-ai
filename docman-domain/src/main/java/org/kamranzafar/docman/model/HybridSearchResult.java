@@ -24,8 +24,7 @@ import java.util.Map;
 
 @Data
 @Builder
-public class DocumentSearchRequest {
-    Map<String, Object> filters;
-    String question;
-    String query;
+public class HybridSearchResult {
+    Map<String, Object> metadata;
+    double score;
 }

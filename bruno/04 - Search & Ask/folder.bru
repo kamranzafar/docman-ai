@@ -4,8 +4,9 @@ meta {
 }
 
 docs {
-  `/document/ask` (RAG via Ollama + vector store) and `/document/search` (lexical OpenSearch
-  query against document metadata). These operate collection-wide, not against a single
+  `/document/ask` (RAG via Ollama + vector store), `/document/search` (lexical OpenSearch
+  query against document metadata), and `/document/search/hybrid` (vector + lexical fused
+  via Reciprocal Rank Fusion). These operate collection-wide, not against a single
   `{{documentId}}` - run a few documents from `01 - Create` through to `INDEXED` first so
   there's something to find.
 

@@ -1,0 +1,36 @@
+meta {
+  name: Hybrid Search - Missing Query (400)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/search/hybrid
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("requires a query", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.body.detail).to.equal("Query is mandatory");
+  });
+}
+
+docs {
+  Unlike `/search`, `filters` alone isn't enough here - `query` drives both the semantic
+  and lexical legs, so it's the mandatory field.
+}

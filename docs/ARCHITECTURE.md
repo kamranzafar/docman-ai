@@ -393,7 +393,7 @@ knowing:
 
 ## Search & RAG
 
-Two independent search paths exist over the same OpenSearch index (`docman-vector-index`):
+Three independent search paths exist over the same OpenSearch index (`docman-vector-index`):
 
 - **`POST /api/v1/document/ask`** — vector similarity search + RAG. The question is embedded, the most
   relevant chunks are retrieved from OpenSearch, and `llama3.1` generates an answer grounded in
@@ -407,6 +407,22 @@ Two independent search paths exist over the same OpenSearch index (`docman-vecto
   fields outside the `metadata` subtree (like raw `content` or the `embedding` vector) no matter
   what key they supply — the query is built from a fixed field-path template, not from arbitrary
   client-supplied query syntax.
+- **`POST /api/v1/document/search/hybrid`** — hybrid search: the same free-text `query` drives two
+  independent retrievals run in sequence — a vector similarity search via `VectorStore.similaritySearch`
+  (embeddings from the active `EmbeddingModel`) and a BM25 `match` query against the chunk's raw
+  `content` field (unlike `/search`, which only ever queries the `metadata` subtree). Optional
+  `filters` (same shape and 10-entry cap as `/search`) are applied as a hard AND constraint to
+  *both* legs before ranking — a metadata `filterExpression` on the vector search, a non-scoring
+  `filter` clause on the OpenSearch `bool` query — so an impossible filter zeroes out both engines
+  rather than silently falling back to unfiltered semantic matches. The two ranked lists (each
+  capped at `QueryConstants.HYBRID_SEARCH_TOP_K`, 10) are fused with **Reciprocal Rank Fusion**:
+  each hit contributes `1 / (60 + rank)` to its `parent_document_id`'s score (rank, not the engine's
+  own similarity/BM25 score, since cosine similarity and BM25 aren't on comparable scales), summed
+  across both legs and sorted descending. A document found by both engines outranks one found by
+  only one, even if neither engine alone put it first — this is the whole point of hybrid search:
+  vector search catches paraphrases/synonyms that share no keywords, BM25 catches exact
+  terms/identifiers (invoice numbers, names) that embeddings can blur together; fusing them covers
+  both failure modes. `DocumentSearchServiceImpl.hybridSearch` implements this in `docman-service`.
 
 Each indexed chunk's metadata includes the caller-supplied `metadata` map, plus two fields the
 system adds automatically: `parent_document_id` (used to collapse/dedupe multiple chunks from the
