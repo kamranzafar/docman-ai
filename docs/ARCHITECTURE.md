@@ -364,14 +364,18 @@ edit — goes through the single `DocumentServiceImpl.update()` method, which no
 document's id to the `document-metadata-sync` Kafka topic right after saving to Mongo.
 `DocumentIndexSyncConsumer` (`docman-api`) consumes that topic, re-fetches the current `DocumentDto`
 (rather than trusting the message payload, which could be stale by the time it's processed), and
-calls `DocumentIndexService.updateMetadata()`, which runs an OpenSearch `update_by_query` scoped to
-this document's chunks (the same `parent_document_id` filter used elsewhere) with a small Painless
-script that merges each key from the current Mongo `metadata`/`documentType` into the chunk's
-existing `metadata` object — key-by-key, not a wholesale replace, so chunk-only fields
-(`parent_document_id`, `chunk_index`, `total_chunks`) survive untouched. Like indexing, this
-deliberately does not force a refresh — this runs off a Kafka consumer with nothing synchronously
-waiting on it, so there's no reason to pay for an immediate segment flush per update at whatever
-rate they arrive; it becomes visible on the next natural refresh cycle instead.
+calls `DocumentIndexService.updateMetadata()` (`docman-service`), which delegates the actual merge
+to `DocumentVectorStore.mergeMetadata()` — see [the provider-agnostic vector store
+split](#vector-store-provider-agnostic-by-module-boundary-not-just-config) below.
+`OpenSearchDocumentVectorStore` (`docman-vector-opensearch`), the only implementation, runs an
+OpenSearch `update_by_query` scoped to this document's chunks (the same `parent_document_id` filter
+used elsewhere) with a small Painless script that merges each key from the current Mongo
+`metadata`/`documentType` into the chunk's existing `metadata` object — key-by-key, not a wholesale
+replace, so chunk-only fields (`parent_document_id`, `chunk_index`, `total_chunks`) survive
+untouched. Like indexing, this deliberately does not force a refresh — this runs off a Kafka
+consumer with nothing synchronously waiting on it, so there's no reason to pay for an immediate
+segment flush per update at whatever rate they arrive; it becomes visible on the next natural
+refresh cycle instead.
 
 This is deliberately a metadata-only patch, not a reindex: it never touches `embedding` or
 `content`, so it doesn't re-run Tika, MinIO, or the embedding model. A few consequences worth
@@ -402,10 +406,10 @@ Three independent search paths exist over the same OpenSearch index (`docman-vec
   on CPU-only hardware — the HTTP request uses Spring MVC's `DeferredResult` so the calling thread
   isn't blocked for the duration.
 - **`POST /api/v1/document/search`** — structured metadata search. Callers supply a map of field → value
-  filters (e.g. `{"documentType": "invoice"}`); the server builds an OpenSearch `bool`/`match`
-  query, prefixing every key with `metadata.` server-side. This means callers can never reach
-  fields outside the `metadata` subtree (like raw `content` or the `embedding` vector) no matter
-  what key they supply — the query is built from a fixed field-path template, not from arbitrary
+  filters (e.g. `{"documentType": "invoice"}`); the query engine builds a `bool`/`match` query,
+  prefixing every key with `metadata.` server-side. This means callers can never reach fields
+  outside the `metadata` subtree (like raw `content` or the `embedding` vector) no matter what key
+  they supply — the query is built from a fixed field-path template, not from arbitrary
   client-supplied query syntax.
 - **`POST /api/v1/document/search/hybrid`** — hybrid search: the same free-text `query` drives two
   independent retrievals run in sequence — a vector similarity search via `VectorStore.similaritySearch`
@@ -423,6 +427,30 @@ Three independent search paths exist over the same OpenSearch index (`docman-vec
   vector search catches paraphrases/synonyms that share no keywords, BM25 catches exact
   terms/identifiers (invoice numbers, names) that embeddings can blur together; fusing them covers
   both failure modes. `DocumentSearchServiceImpl.hybridSearch` implements this in `docman-service`.
+
+### Vector store: provider-agnostic by module boundary, not just config
+
+Unlike the chat/embedding model provider (both Ollama's and OpenAI's starters are always on the
+classpath, config-selected at runtime — see the top of this document), the vector store provider
+is swapped at the Maven module level. `docman-service` depends only on Spring AI's portable
+`spring-ai-vector-store` artifact (`VectorStore`, `SearchRequest`, `Filter`) for everything it
+already makes provider-neutral — semantic search, add, delete, and the RAG advisor used by
+`/ask`. Three operations have no Spring AI equivalent and go through a small custom interface
+instead, `DocumentVectorStore` (declared in `docman-service`):
+
+- `searchByMetadata` — the `/search` query above
+- `searchByContent` — the lexical/BM25 leg of `/search/hybrid`
+- `mergeMetadata` — the Painless `update_by_query` merge used by the [vector store metadata
+  sync](#keeping-vector-store-metadata-in-sync)
+
+The only implementation, `OpenSearchDocumentVectorStore`, lives in its own module,
+`docman-vector-opensearch` — the sole place in the codebase with an OpenSearch dependency (the
+`OpenSearchClient` bean and the OpenSearch `VectorStore` autoconfiguration both come from that
+module's `spring-ai-starter-vector-store-opensearch` dependency). `docman-api` depends on it to put
+it on the runtime classpath. Swapping vector stores means writing a new sibling module that
+implements `DocumentVectorStore` and pointing `docman-api` at it instead of
+`docman-vector-opensearch` — no `docman-service` code changes, since it never imports anything
+OpenSearch-specific in the first place.
 
 Each indexed chunk's metadata includes the caller-supplied `metadata` map, plus two fields the
 system adds automatically: `parent_document_id` (used to collapse/dedupe multiple chunks from the
