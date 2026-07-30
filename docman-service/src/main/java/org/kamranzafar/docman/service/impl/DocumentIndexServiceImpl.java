@@ -17,17 +17,12 @@
 package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.DocumentStatus;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentIndexService;
+import org.kamranzafar.docman.service.DocumentVectorStore;
 import org.kamranzafar.docman.service.ObjectStoreService;
-import org.opensearch.client.json.JsonData;
-import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch._types.FieldValue;
-import org.opensearch.client.opensearch._types.query_dsl.Query;
-import org.opensearch.client.opensearch.core.UpdateByQueryResponse;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -35,7 +30,6 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -44,7 +38,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,19 +45,6 @@ import java.util.Map;
 @Slf4j
 @Service
 public class DocumentIndexServiceImpl implements DocumentIndexService {
-    // Merges params.metadata into the existing metadata object key-by-key, rather than
-    // replacing it outright, so chunk-only fields (parent_document_id, chunk_index,
-    // total_chunks) added at indexing time survive a later metadata sync.
-    private static final String METADATA_MERGE_SCRIPT = """
-            if (ctx._source.metadata == null) { ctx._source.metadata = new HashMap(); }
-            for (entry in params.metadata.entrySet()) {
-                ctx._source.metadata[entry.getKey()] = entry.getValue();
-            }
-            """;
-
-    @Value(value = "${spring.ai.vectorstore.opensearch.index-name}")
-    private String indexName;
-
     @Autowired
     private ObjectStoreService objectStoreService;
     @Autowired
@@ -72,7 +52,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
     @Autowired
     private VectorStore vectorStore;
     @Autowired
-    private OpenSearchClient openSearchClient;
+    private DocumentVectorStore documentVectorStore;
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -138,29 +118,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             return;
         }
 
-        Query filter = Query.of(q -> q.term(t -> t
-                .field(QueryConstants.QUERY_METADATA_FIELD_PREFIX
-                        + QueryConstants.PARENT_DOCUMENT_ID_METADATA_KEY + ".keyword")
-                .value(FieldValue.of(document.getId().toString()))));
-
-        try {
-            // No forced refresh here either: this runs off a Kafka consumer, nothing
-            // is synchronously waiting on the result, so it's fine to let it become
-            // visible on the next natural refresh cycle rather than force one per
-            // update at whatever rate updates arrive.
-            UpdateByQueryResponse response = openSearchClient.updateByQuery(u -> u
-                    .index(indexName)
-                    .query(filter)
-                    .script(s -> s.inline(i -> i
-                            .lang("painless")
-                            .source(METADATA_MERGE_SCRIPT)
-                            .params("metadata", JsonData.of(mergeFields)))));
-
-            log.info("Synced metadata into {} indexed chunk(s) for document {}",
-                    response.updated(), document.getId());
-        } catch (IOException e) {
-            throw new DocmanException("Failed to sync document metadata to vector index", e);
-        }
+        documentVectorStore.mergeMetadata(document.getId().toString(), mergeFields);
     }
 
     @Override

@@ -17,30 +17,22 @@
 package org.kamranzafar.docman.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.HybridSearchResult;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentSearchService;
-import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch._types.FieldValue;
-import org.opensearch.client.opensearch._types.query_dsl.Query;
-import org.opensearch.client.opensearch.core.SearchRequest;
-import org.opensearch.client.opensearch.core.SearchResponse;
-import org.opensearch.client.opensearch.core.search.FieldCollapse;
-import org.opensearch.client.opensearch.core.search.Hit;
-import org.opensearch.client.opensearch.core.search.SourceConfig;
+import org.kamranzafar.docman.service.DocumentVectorStore;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -50,12 +42,10 @@ import java.util.Map;
 @Slf4j
 @Service
 public class DocumentSearchServiceImpl implements DocumentSearchService {
-    @Value(value = "${spring.ai.vectorstore.opensearch.index-name}")
-    private String indexName;
     @Autowired
     private VectorStore vectorStore;
     @Autowired
-    private OpenSearchClient openSearchClient;
+    private DocumentVectorStore documentVectorStore;
     private final ChatClient chatClient;
 
     public DocumentSearchServiceImpl(ChatClient.Builder chatClientBuilder) {
@@ -81,67 +71,38 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
 
     @Override
     public List<Object> lexicalSearch(Map<String, Object> filters) {
-        log.info("Searching for documents with filters {}", filters);
+        List<Object> documents = documentVectorStore.searchByMetadata(filters);
 
-        SearchRequest request = SearchRequest.of(s -> s
-                .index(indexName)
-                .query(Query.of(q -> q.bool(b -> {
-                    filters.forEach((key, value) -> b.must(m -> m.match(mm -> mm
-                            .field(QueryConstants.QUERY_METADATA_FIELD_PREFIX + key)
-                            .query(FieldValue.of(String.valueOf(value))))));
-                    return b;
-                })))
-                .collapse(FieldCollapse.of(fc -> fc.field(QueryConstants.QUERY_COLLAPSE_FIELD)))
-                .source(SourceConfig.of(sc ->
-                        sc.filter(sf -> sf.includes(QueryConstants.QUERY_SOURCE_INCLUDE))))
-        );
-
-        try {
-            SearchResponse<Object> response = openSearchClient.search(request, Object.class);
-
-            if (response.hits().hits().isEmpty()) {
-                throw new DocumentNotFoundException("No matching document(s) found");
-            }
-
-            List<Object> documents = new ArrayList<>();
-            for (Hit<Object> hit : response.hits().hits()) {
-                log.info("Document found {}", hit.source());
-                documents.add(hit.source());
-            }
-
-            return documents;
-        } catch (IOException e) {
-            throw new DocmanException("Failed to search documents", e);
+        if (documents.isEmpty()) {
+            throw new DocumentNotFoundException("No matching document(s) found");
         }
+
+        return documents;
     }
 
     @Override
     public List<HybridSearchResult> hybridSearch(String query, Map<String, Object> filters) {
         log.info("Hybrid search for '{}' with filters {}", query, filters);
 
-        List<org.springframework.ai.document.Document> semanticHits = semanticSearch(query, filters);
-        List<Hit<Object>> lexicalHits = contentSearch(query, filters);
+        List<Document> semanticHits = semanticSearch(query, filters);
+        List<Map<String, Object>> lexicalHits = documentVectorStore.searchByContent(
+                query, filters, QueryConstants.HYBRID_SEARCH_TOP_K);
 
         // Reciprocal Rank Fusion: each leg contributes 1/(k+rank) per document (keyed by
         // parent_document_id, since both legs return chunk-level hits), regardless of the
-        // leg's own score scale - vector cosine similarity and OpenSearch BM25 scores
+        // leg's own score scale - vector cosine similarity and the lexical engine's own score
         // aren't otherwise comparable, so combining by rank rather than raw score is what
         // makes fusion meaningful.
         Map<String, Double> rrfScores = new LinkedHashMap<>();
         Map<String, Map<String, Object>> metadataById = new LinkedHashMap<>();
 
         int rank = 1;
-        for (org.springframework.ai.document.Document doc : semanticHits) {
+        for (Document doc : semanticHits) {
             accumulateRrf(parentDocumentId(doc.getMetadata()), doc.getMetadata(), rank++, rrfScores, metadataById);
         }
 
         rank = 1;
-        for (Hit<Object> hit : lexicalHits) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> source = (Map<String, Object>) hit.source();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> metadata = source == null
-                    ? null : (Map<String, Object>) source.get(QueryConstants.QUERY_SOURCE_INCLUDE);
+        for (Map<String, Object> metadata : lexicalHits) {
             accumulateRrf(parentDocumentId(metadata), metadata, rank++, rrfScores, metadataById);
         }
 
@@ -173,11 +134,10 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
         return id == null ? null : String.valueOf(id);
     }
 
-    private List<org.springframework.ai.document.Document> semanticSearch(String query, Map<String, Object> filters) {
-        org.springframework.ai.vectorstore.SearchRequest.Builder requestBuilder =
-                org.springframework.ai.vectorstore.SearchRequest.builder()
-                        .query(query)
-                        .topK(QueryConstants.HYBRID_SEARCH_TOP_K);
+    private List<Document> semanticSearch(String query, Map<String, Object> filters) {
+        SearchRequest.Builder requestBuilder = SearchRequest.builder()
+                .query(query)
+                .topK(QueryConstants.HYBRID_SEARCH_TOP_K);
 
         Filter.Expression filterExpression = toFilterExpression(filters);
         if (filterExpression != null) {
@@ -200,33 +160,5 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
         }
 
         return combined.build();
-    }
-
-    private List<Hit<Object>> contentSearch(String query, Map<String, Object> filters) {
-        SearchRequest request = SearchRequest.of(s -> s
-                .index(indexName)
-                .size(QueryConstants.HYBRID_SEARCH_TOP_K)
-                .query(Query.of(q -> q.bool(b -> {
-                    b.must(m -> m.match(mm -> mm
-                            .field(QueryConstants.CONTENT_FIELD)
-                            .query(FieldValue.of(query))));
-                    if (filters != null) {
-                        filters.forEach((key, value) -> b.filter(f -> f.match(mm -> mm
-                                .field(QueryConstants.QUERY_METADATA_FIELD_PREFIX + key)
-                                .query(FieldValue.of(String.valueOf(value))))));
-                    }
-                    return b;
-                })))
-                .collapse(FieldCollapse.of(fc -> fc.field(QueryConstants.QUERY_COLLAPSE_FIELD)))
-                .source(SourceConfig.of(sc ->
-                        sc.filter(sf -> sf.includes(QueryConstants.QUERY_SOURCE_INCLUDE))))
-        );
-
-        try {
-            SearchResponse<Object> response = openSearchClient.search(request, Object.class);
-            return response.hits().hits();
-        } catch (IOException e) {
-            throw new DocmanException("Failed to search documents", e);
-        }
     }
 }
