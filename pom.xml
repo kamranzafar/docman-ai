@@ -19,6 +19,7 @@
         <module>docman-service</module>
         <module>docman-domain</module>
         <module>docman-persistence</module>
+        <module>docman-vector-opensearch</module>
         <module>docman-workflow</module>
         <module>docman-api</module>
     </modules>
