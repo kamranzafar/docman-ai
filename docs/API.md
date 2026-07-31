@@ -65,7 +65,7 @@ body:
 
 | Status | When |
 |--------|------|
-| 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question, missing hybrid search query) |
+| 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question, question too long, missing hybrid search query) |
 | 404    | Document id doesn't exist |
 | 409    | An update (`POST`/`PUT /api/v1/document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
 | 500    | Unhandled server error |
@@ -360,13 +360,17 @@ doesn't tie up a web server thread while waiting; the client still simply waits 
 response. If it takes longer than ~650 seconds the server returns `503 Service Unavailable` with a
 timeout message.
 
-**Errors**: `400` if `question` is blank/missing.
+**Errors**: `400` if `question` is blank/missing, or longer than `QueryConstants.QUERY_MAX_QUESTION_LENGTH`
+(2000 characters).
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What does the invoice from acme cover?"}'
 ```
+
+See [Prompt-injection mitigations](ARCHITECTURE.md#prompt-injection-mitigations) for how the
+question and the retrieved document context are handled before reaching the chat model.
 
 ---
 

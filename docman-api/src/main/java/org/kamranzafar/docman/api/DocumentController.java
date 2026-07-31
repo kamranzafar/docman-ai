@@ -173,6 +173,10 @@ public class DocumentController {
         if (!StringUtils.hasText(request.getQuestion())) {
             throw new DocmanException("Question is mandatory");
         }
+        if (request.getQuestion().length() > QueryConstants.QUERY_MAX_QUESTION_LENGTH) {
+            throw new DocmanException(
+                    "Question exceeds maximum length of " + QueryConstants.QUERY_MAX_QUESTION_LENGTH + " characters");
+        }
 
         DeferredResult<ResponseEntity<?>> deferredResult = new DeferredResult<>(ASK_TIMEOUT_MS);
         deferredResult.onTimeout(() -> deferredResult.setErrorResult(

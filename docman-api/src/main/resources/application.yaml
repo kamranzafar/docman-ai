@@ -49,6 +49,16 @@ spring:
     model:
       chat: ollama
       embedding: ollama
+      # This app never uses audio/image/moderation models, but the OpenAI starter's
+      # autoconfigurations for them default to enabled (matchIfMissing=true) when
+      # unset, unlike chat/embedding above - so without this they'd try to build
+      # OpenAI beans (and fail on the missing api-key) even under this Ollama
+      # profile just because the OpenAI starter is on the classpath.
+      audio:
+        speech: none
+        transcription: none
+      image: none
+      moderation: none
     vectorstore:
       opensearch:
         uris: https://localhost:9200
