@@ -93,8 +93,10 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
         log.info("Classifying document {}", document.getId());
 
         String response = chatClient.prompt()
+                .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().filterExpression(documentFilter).build())
+                        .promptTemplate(PromptGuardrails.QUESTION_ANSWER_TEMPLATE)
                         .build())
                 .options(ChatOptions.builder().temperature(CLASSIFICATION_TEMPERATURE).build())
                 .user(String.format(CLASSIFICATION_QUESTION, categories))

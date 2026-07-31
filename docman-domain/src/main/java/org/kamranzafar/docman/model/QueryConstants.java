@@ -24,6 +24,9 @@ public interface QueryConstants {
     String QUERY_SOURCE_INCLUDE = "metadata";
     String QUERY_METADATA_FIELD_PREFIX = "metadata.";
     int QUERY_MAX_FILTERS = 10;
+    // Caps the /ask question size - a free-text field with no other length limit that
+    // otherwise goes straight into an LLM prompt.
+    int QUERY_MAX_QUESTION_LENGTH = 2000;
     String CONTENT_FIELD = "content";
     int HYBRID_SEARCH_TOP_K = 10;
     // Reciprocal Rank Fusion constant - dampens the influence of low-ranked hits from

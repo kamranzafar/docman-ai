@@ -136,6 +136,7 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `spring.ai.vectorstore.opensearch.uris`                             | `https://localhost:9200`          | OpenSearch endpoint |
 | `spring.ai.vectorstore.opensearch.dimensions`                        | `768`                             | Must match the active embedding model's output size (`nomic-embed-text` = 768; `text-embedding-3-small` = 1536 in the `prod` profile) |
 | `spring.ai.model.chat` / `spring.ai.model.embedding`                    | `ollama` / `ollama`               | Selects which bundled Spring AI starter (Ollama or OpenAI) actually wires up the `ChatModel`/`EmbeddingModel` beans — see [Production profile (OpenAI)](#production-profile-openai) |
+| `spring.ai.model.audio.speech` / `.audio.transcription` / `.image` / `.moderation` | `none` / `none` / `none` / `none` | Explicitly disabled — this app never uses these capabilities, but the OpenAI starter's autoconfigurations for them default to *enabled* when unset (unlike chat/embedding), so leaving them out would try to build unconfigured OpenAI beans on startup and fail. See [Troubleshooting](#troubleshooting) |
 | `spring.ai.ollama.base-url`                                            | `http://localhost:11434/`         | Ollama endpoint |
 | `spring.ai.ollama.embedding.options.model`                               | `nomic-embed-text`                | Embedding model |
 | `spring.ai.ollama.chat.model`                                               | `llama3.1`                        | Chat model, used for RAG answers, summarization, and classification |
@@ -221,6 +222,17 @@ by this profile — only the model provider and vector index change.
 - **Mongo repository not picking up documents**: confirm `Application`'s
   `@EnableMongoRepositories(basePackages = "org.kamranzafar.docman.repository")` matches wherever
   `DocumentMetadataRepository` actually lives — this has drifted before during refactors.
+- **App fails to start with `BeanCreationException: Error creating bean with name
+  'openAiAudioSpeechModel'` (or `...TranscriptionModel`/`...ImageModel`/`...ModerationModel`) /
+  "OpenAI API key must be set"**: this means one of the `spring.ai.model.audio.speech` /
+  `.audio.transcription` / `.image` / `.moderation` properties described above was removed or
+  overridden. Both Ollama and OpenAI starters are always on the classpath (see
+  [Production profile (OpenAI)](#production-profile-openai)), and unlike `spring.ai.model.chat`
+  /`.embedding`, these four OpenAI autoconfigurations activate by default
+  (`matchIfMissing=true`) when their property is unset — regardless of the active profile or
+  which provider `chat`/`embedding` point at. Restore the four `none` values in
+  `application.yaml`, or set `OPENAI_API_KEY` if you actually intend to use one of those
+  capabilities.
 - **Every OpenAI chat call (`prod` profile) fails with `JsonEOFException` / "Unexpected
   end-of-input" after the response's opening `{`**: this was hit and root-caused during initial
   end-to-end testing of the `prod` profile in this environment — a gzip-encoded response from

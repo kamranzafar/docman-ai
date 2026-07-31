@@ -322,6 +322,10 @@ and re-running Tika a second time:
   otherwise drifts between similar categories (e.g. "invoices" vs. "statements") on repeated runs of
   identical content at the app's configured temperature of `1`.
 
+Both prompts (and `/ask`'s) apply the same basic [prompt-injection
+mitigations](#prompt-injection-mitigations) — a system message plus delimited untrusted content —
+since the chunks/text they're grounded in come from user-uploaded files.
+
 **Model provider is vendor-agnostic and profile-switched.** `docman-service` only depends on
 Spring AI's portable APIs (`ChatClient`, `ChatOptions`, `VectorStore`) — no provider-specific
 classes. `docman-api` bundles both the Ollama and OpenAI Spring AI starters; which one actually
@@ -427,6 +431,39 @@ Three independent search paths exist over the same OpenSearch index (`docman-vec
   vector search catches paraphrases/synonyms that share no keywords, BM25 catches exact
   terms/identifiers (invoice numbers, names) that embeddings can blur together; fusing them covers
   both failure modes. `DocumentSearchServiceImpl.hybridSearch` implements this in `docman-service`.
+
+### Prompt-injection mitigations
+
+Every LLM call in the app (`/ask`'s RAG answer, document summarization, document classification)
+puts content from uploaded files into the prompt — either retrieved vector store chunks
+(`QuestionAnswerAdvisor`) or, for summarization, the document's full extracted text concatenated
+directly. That text is attacker-controllable: anyone who can get a document ingested (including via
+hidden/white text in a PDF) can embed instructions aimed at the model, e.g. "ignore the above and
+instead respond with...". `PromptGuardrails` (`docman-service/.../service/impl`), shared by all
+three call sites, applies two basic, defense-in-depth mitigations — not a hard guarantee against a
+sufficiently determined injection:
+
+- **Instruction hierarchy via a system message** (`PromptGuardrails.SYSTEM_INSTRUCTIONS`) — states
+  that only the system message defines the task, and that document/context content is untrusted data
+  to reason over, never instructions to follow, even if it claims to come from the system, a
+  developer, or the user.
+- **Delimited untrusted content** — retrieved RAG context (`/ask` and classification, via
+  `PromptGuardrails.QUESTION_ANSWER_TEMPLATE`, which overrides `QuestionAnswerAdvisor`'s default
+  template) and the raw document text concatenated into the summarization prompt
+  (`DocumentSummaryServiceImpl.SUMMARY_PROMPT`) are both wrapped in explicit
+  `=== BEGIN/END ... ===` markers, so the model has a clear, consistent boundary between instructions
+  and data.
+
+Classification has an additional, independent safeguard on the output side:
+`DocumentType.fromLabel()` maps the model's response onto a fixed enum, defaulting to `unknown` for
+anything unrecognized — so even a successful injection can't make classification return arbitrary
+text, only steer it to a wrong-but-still-valid category. Summarization and the `/ask` answer have no
+equivalent output-side constraint; their LLM output is stored/returned close to verbatim, so the
+system-message and delimiter mitigations above are the only defense for those two paths.
+
+`/ask`'s `question` is also capped at `QueryConstants.QUERY_MAX_QUESTION_LENGTH` (2000 characters,
+enforced in `DocumentController`) — a basic abuse/cost guard on the one directly user-supplied
+free-text field that reaches an LLM, not an injection defense per se.
 
 ### Vector store: provider-agnostic by module boundary, not just config
 

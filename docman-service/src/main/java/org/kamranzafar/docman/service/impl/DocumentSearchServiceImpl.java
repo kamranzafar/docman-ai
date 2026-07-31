@@ -57,7 +57,10 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
         log.info("Vector search with prompt '{}'", question);
 
         ChatResponse response = chatClient.prompt()
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore).build())
+                .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .promptTemplate(PromptGuardrails.QUESTION_ANSWER_TEMPLATE)
+                        .build())
                 .user(question)
                 .call()
                 .chatResponse();

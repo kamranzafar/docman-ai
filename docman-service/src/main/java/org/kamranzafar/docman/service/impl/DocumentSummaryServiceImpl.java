@@ -35,12 +35,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class DocumentSummaryServiceImpl implements DocumentSummaryService {
+    // Delimits the raw, untrusted document text so the model can distinguish it from the
+    // instructions above it - see PromptGuardrails for the accompanying system message.
     private static final String SUMMARY_PROMPT = """
-            Summarize the following document in 2-3 concise sentences. \
+            Summarize the document below in 2-3 concise sentences. \
             Respond with only the summary, no preamble.
 
-            Document:
-            %s""";
+            === BEGIN DOCUMENT ===
+            %s
+            === END DOCUMENT ===""";
 
     // Large enough to pull every chunk belonging to a single document
     // regardless of similarity ranking - the parent_document_id filter below
@@ -93,6 +96,7 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
         log.info("Generating summary for document {}", document.getId());
 
         String summary = chatClient.prompt()
+                .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
                 .user(String.format(SUMMARY_PROMPT, text))
                 .call()
                 .content();
