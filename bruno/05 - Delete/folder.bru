@@ -9,9 +9,12 @@ docs {
   - **Soft Delete Document** - flips the `deleted` flag on the Mongo record; everything
     else (record, revision history, MinIO content, vector store chunks) is left in place,
     and the flag propagates to the indexed chunks asynchronously so search stops
-    surfacing the document. There is no API-level undo.
+    surfacing the document. Reversible via **Restore Document**.
   - **Delete Document** (hard delete) - tears down a document entirely: terminates its
     Temporal workflow, deletes all vector store chunks, removes every version's object
     from MinIO (`{{documentId}}/*` prefix, not just the latest), deletes the Mongo
-    document, and deletes its revision history.
+    document, and deletes its revision history. Not reversible.
+
+  Run order: Soft Delete Document (1) -> Restore Document (2, verifies the undo path) ->
+  Delete Document (3, permanent - afterward `{{documentId}}` no longer resolves).
 }

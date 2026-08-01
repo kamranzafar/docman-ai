@@ -72,6 +72,15 @@ public interface DocumentService {
      */
     void softDelete(UUID id);
 
+    /**
+     * Restore: marks {@code deleted} false (targeted field update, same rationale as
+     * {@link #updateStatus}), reversing a prior {@link #softDelete}. Triggers the same
+     * metadata-sync path as {@link #softDelete} so the cleared {@code deleted} flag is
+     * asynchronously synced into the document's already-indexed vector store chunks,
+     * making it visible to search/RAG again.
+     */
+    DocumentDto restore(UUID id);
+
     DocumentDto findMetadata(UUID id);
 
     /**

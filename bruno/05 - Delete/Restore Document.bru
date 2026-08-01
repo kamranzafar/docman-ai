@@ -1,0 +1,33 @@
+meta {
+  name: Restore Document
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}/restore
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 200 with deleted false", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.document.deleted).to.equal(false);
+  });
+}
+
+docs {
+  Reverses "Soft Delete Document" - flips `deleted` back to `false`. Everything else about
+  the document is untouched; the cleared flag propagates to the indexed chunks
+  asynchronously via the same Kafka metadata-sync consumer, after which `/ask`, `/search`,
+  and `/search/hybrid` surface the document again.
+
+  Run this after "Soft Delete Document" to verify the undo path, before "Delete Document"
+  (the hard delete) permanently removes the document.
+}

@@ -51,7 +51,9 @@ starts at `1` and only increments on a user-driven change via `PUT /api/v1/docum
 does and doesn't bump it.
 
 `deleted` is `true` once the document has been soft-deleted (see
-[`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document) below) —
+[`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document) below,
+reversible via
+[`POST /api/v1/document/{id}/restore`](#post-apiv1documentidrestore--restore-a-soft-deleted-document)) —
 `false` for every document by default. `authorisation` is a reserved, nullable string field for a
 future document-level access-control code; nothing in the API currently reads or enforces it.
 
@@ -541,8 +543,8 @@ and `deleted: true` actually excluding the document from
 `GET /api/v1/document/metadata/{id}` (reading straight from Mongo) reflects the new `deleted` value
 immediately.
 
-There is currently no "undelete" endpoint — reversing a soft delete means flipping `deleted` back
-via a direct Mongo update, which isn't exposed over the API.
+See [`POST /api/v1/document/{id}/restore`](#post-apiv1documentidrestore--restore-a-soft-deleted-document)
+below to reverse this.
 
 **Path parameter**: `id` — the document UUID.
 
@@ -552,6 +554,57 @@ via a direct Mongo update, which isn't exposed over the API.
 
 ```shell
 curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/soft"
+```
+
+---
+
+## `POST /api/v1/document/{id}/restore` — restore a soft-deleted document
+
+Reverses a soft delete: flips `deleted` back to `false` on the Mongo record — nothing else about
+the document (content, metadata, revision history) is touched. Like the soft delete itself, this is
+just a targeted field update.
+
+That flag change is propagated to the document's indexed chunks **asynchronously**, via the same
+Kafka-driven metadata sync described for
+[`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document) — so
+there's typically a small delay (milliseconds to a couple of seconds locally) before the document
+reappears in [`/ask`](#post-apiv1documentask--ask-a-question-rag),
+[`/search`](#post-apiv1documentsearch--structured-metadata-search), and
+[`/search/hybrid`](#post-apiv1documentsearchhybrid--hybrid-semantic--lexical-search).
+`GET /api/v1/document/metadata/{id}` reflects the new `deleted` value immediately.
+
+Restoring a document that isn't currently soft-deleted (`deleted` already `false`) is a harmless
+no-op — it still returns `200` with the unchanged document.
+
+**Path parameter**: `id` — the document UUID.
+
+**Response** `200 OK`: the updated document (see [Document
+representation](#document-representation) — `deleted` will be `false`):
+
+```json
+{
+  "document": {
+    "id": "a391f59e-f0fb-4d98-a36c-9f7706cebb8a",
+    "name": "invoice-123.pdf",
+    "contentType": "application/pdf",
+    "status": "INDEXED",
+    "documentType": "invoices",
+    "metadata": { "vendor": "acme" },
+    "createdAt": "2026-07-24T05:01:43.877Z",
+    "createdBy": "alice",
+    "updatedAt": "2026-07-24T05:01:43.877Z",
+    "updatedBy": "alice",
+    "version": 1,
+    "deleted": false,
+    "authorisation": null
+  }
+}
+```
+
+**Errors**: `404` if the id doesn't exist, `400` if it's not a valid UUID.
+
+```shell
+curl -X POST "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/restore"
 ```
 
 ---
@@ -572,6 +625,7 @@ curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f
 | `POST`   | `/api/v1/document/search/hybrid`              | Hybrid search (semantic + lexical, RRF-fused; excludes soft-deleted documents) |
 | `DELETE` | `/api/v1/document/{id}`                       | Delete document, all versions (full cleanup)           |
 | `DELETE` | `/api/v1/document/{id}/soft`                  | Soft-delete: mark deleted, keep record/content/index    |
+| `POST`   | `/api/v1/document/{id}/restore`               | Restore: reverse a soft delete                          |
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/
 OpenSearch debug requests) is in the `bruno/` directory at the repository root.

@@ -133,7 +133,7 @@ public class DocumentServiceImpl implements DocumentService {
         kafkaTemplate.send(metadataSyncTopic, id.toString());
     }
 
-    private void applyUpdate(UUID id, Update update) {
+    private Document applyUpdate(UUID id, Update update) {
         Query query = Query.query(Criteria.where("_id").is(id));
         Document saved = mongoTemplate.findAndModify(
                 query, update, FindAndModifyOptions.options().returnNew(true), Document.class);
@@ -141,6 +141,8 @@ public class DocumentServiceImpl implements DocumentService {
         if (saved == null) {
             throw new DocumentNotFoundException("Document not found");
         }
+
+        return saved;
     }
 
     @Transactional
@@ -243,6 +245,18 @@ public class DocumentServiceImpl implements DocumentService {
         applyUpdate(id, Update.update("deleted", true));
 
         kafkaTemplate.send(metadataSyncTopic, id.toString());
+    }
+
+    @Transactional
+    @Override
+    public DocumentDto restore(UUID id) {
+        log.info("Restoring soft-deleted document {}", id);
+
+        Document document = applyUpdate(id, Update.update("deleted", false));
+
+        kafkaTemplate.send(metadataSyncTopic, id.toString());
+
+        return documentMapper.toDto(document);
     }
 
     @Override
