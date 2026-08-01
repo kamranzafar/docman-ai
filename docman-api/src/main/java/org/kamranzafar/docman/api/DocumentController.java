@@ -281,6 +281,16 @@ public class DocumentController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<?> restore(@PathVariable String id) {
+        DocumentDto document = documentService.restore(parseId(id));
+
+        DocumentResponse documentResponse = new DocumentResponse();
+        documentResponse.setDocument(document);
+
+        return ResponseEntity.ok(documentResponse);
+    }
+
     private UUID parseId(String id) {
         try {
             return UUID.fromString(id);

@@ -315,14 +315,19 @@ current `deleted` value into every one of the document's indexed chunks. There's
 code path for the delete case; soft delete works by making sure `deleted` is one of the fields that
 sync keeps current, and making sure every search path filters on it.
 
-Two consequences follow directly from reusing that mechanism:
+One consequence follows directly from reusing that mechanism: the exclusion is **asynchronous**,
+with the same eventual-consistency window as any other metadata sync (typically milliseconds to a
+couple of seconds locally) — a search issued immediately after `DELETE .../soft` returns `204` can
+still briefly include the document, and symmetrically, a search issued right after `POST
+.../restore` can briefly still exclude it.
 
-- The exclusion is **asynchronous**, with the same eventual-consistency window as any other
-  metadata sync (typically milliseconds to a couple of seconds locally) — a search issued
-  immediately after `DELETE .../soft` returns `204` can still briefly include the document.
-- There's no API-level "undelete." Reversing a soft delete means directly flipping `deleted` back to
-  `false` in Mongo (which would need to publish to `document-metadata-sync` again to re-sync the
-  vector store) — nothing in `DocumentService`/`DocumentController` currently exposes that.
+`POST /api/v1/document/{id}/restore` (`DocumentController.restore` → `DocumentServiceImpl.restore`)
+reverses a soft delete: the same targeted Mongo update as `softDelete`, just setting `deleted` back
+to `false`, followed by the same publish to `document-metadata-sync` so the cleared flag propagates
+to the indexed chunks the same way. Unlike `softDelete` (`204 No Content`), it returns `200` with
+the updated `DocumentDto` — there's no other state change to report back, so echoing the document
+confirms `deleted` actually flipped. Restoring a document that's already not soft-deleted is a
+harmless no-op (`applyUpdate` still succeeds, `deleted` was already `false`).
 
 `Document.authorisation` (nullable `String`) is a related, currently-inert field on the same model
 — reserved for a future document-level access-control code, but nothing reads or enforces it yet.

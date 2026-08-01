@@ -28,6 +28,7 @@ docs {
   only pick it up asynchronously via the Kafka metadata-sync consumer, so `/ask`, `/search`,
   and `/search/hybrid` may briefly still surface the document for a moment afterward.
 
-  Run this before "Delete Document" - the hard delete below removes the document entirely,
-  after which `{{documentId}}` no longer resolves to anything.
+  Run this before "Restore Document" (verifies the undo path) and "Delete Document" (the
+  hard delete, which removes the document entirely - afterward `{{documentId}}` no longer
+  resolves to anything).
 }
