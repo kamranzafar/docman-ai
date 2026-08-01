@@ -235,6 +235,16 @@ public class DocumentServiceImpl implements DocumentService {
         documentRevisionRepository.deleteByDocumentId(document.getId());
     }
 
+    @Transactional
+    @Override
+    public void softDelete(UUID id) {
+        log.info("Soft deleting document {}", id);
+
+        applyUpdate(id, Update.update("deleted", true));
+
+        kafkaTemplate.send(metadataSyncTopic, id.toString());
+    }
+
     @Override
     public DocumentDto findMetadata(UUID id) {
         log.info("Finding document metadata with id {}", id);

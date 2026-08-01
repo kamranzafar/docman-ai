@@ -74,6 +74,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             if (StringUtils.hasText(document.getDocumentType())) {
                 indexedMetadata.put(QueryConstants.DOCUMENT_TYPE_METADATA_KEY, document.getDocumentType());
             }
+            indexedMetadata.put(QueryConstants.DELETED_METADATA_KEY, document.isDeleted());
 
             org.springframework.ai.document.Document d
                     = new org.springframework.ai.document.Document(
@@ -112,11 +113,10 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
         if (StringUtils.hasText(document.getDocumentType())) {
             mergeFields.put(QueryConstants.DOCUMENT_TYPE_METADATA_KEY, document.getDocumentType());
         }
-
-        if (mergeFields.isEmpty()) {
-            log.debug("No metadata to sync into the vector store for document {}", document.getId());
-            return;
-        }
+        // Always synced (unlike documentType, a boolean has no "absent" state worth
+        // skipping) so every metadata-sync trigger - including softDelete - keeps each
+        // chunk's deleted flag current.
+        mergeFields.put(QueryConstants.DELETED_METADATA_KEY, document.isDeleted());
 
         documentVectorStore.mergeMetadata(document.getId().toString(), mergeFields);
     }

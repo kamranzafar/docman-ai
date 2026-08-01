@@ -41,4 +41,5 @@ public class DocumentDto {
     Instant updatedAt;
     String updatedBy;
     int version;
+    boolean deleted;
 }

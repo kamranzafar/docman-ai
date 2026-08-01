@@ -19,6 +19,7 @@ package org.kamranzafar.docman.model;
 public interface QueryConstants {
     String PARENT_DOCUMENT_ID_METADATA_KEY = "parent_document_id";
     String DOCUMENT_TYPE_METADATA_KEY = "documentType";
+    String DELETED_METADATA_KEY = "deleted";
     String SUMMARY_METADATA_KEY = "summary";
     String QUERY_COLLAPSE_FIELD = "metadata." + PARENT_DOCUMENT_ID_METADATA_KEY + ".keyword";
     String QUERY_SOURCE_INCLUDE = "metadata";

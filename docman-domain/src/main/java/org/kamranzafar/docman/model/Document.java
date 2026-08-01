@@ -39,4 +39,6 @@ public class Document {
     Instant updatedAt;
     String updatedBy;
     int version;
+    String authorisation;
+    boolean deleted = false;
 }

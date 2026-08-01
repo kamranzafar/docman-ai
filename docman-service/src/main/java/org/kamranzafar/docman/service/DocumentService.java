@@ -63,6 +63,15 @@ public interface DocumentService {
 
     void delete(DocumentDto document);
 
+    /**
+     * Soft delete: marks {@code deleted} true (targeted field update, same rationale as
+     * {@link #updateStatus}) without removing the Mongo record, object storage content, or
+     * indexed chunks. Triggers the same metadata-sync path as {@link #mergeSummary}/
+     * {@link #updateDocumentType} so the {@code deleted} flag is asynchronously synced into
+     * the document's already-indexed vector store chunks.
+     */
+    void softDelete(UUID id);
+
     DocumentDto findMetadata(UUID id);
 
     /**
