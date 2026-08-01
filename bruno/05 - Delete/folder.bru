@@ -4,8 +4,14 @@ meta {
 }
 
 docs {
-  Tears down a document entirely: terminates its Temporal workflow, deletes all vector
-  store chunks, removes every version's object from MinIO (`{{documentId}}/*` prefix, not
-  just the latest), deletes the Mongo document, and deletes its revision history. There is
-  no soft-delete/undo.
+  Two deletion mechanisms:
+
+  - **Soft Delete Document** - flips the `deleted` flag on the Mongo record; everything
+    else (record, revision history, MinIO content, vector store chunks) is left in place,
+    and the flag propagates to the indexed chunks asynchronously so search stops
+    surfacing the document. There is no API-level undo.
+  - **Delete Document** (hard delete) - tears down a document entirely: terminates its
+    Temporal workflow, deletes all vector store chunks, removes every version's object
+    from MinIO (`{{documentId}}/*` prefix, not just the latest), deletes the Mongo
+    document, and deletes its revision history.
 }

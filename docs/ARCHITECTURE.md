@@ -295,6 +295,38 @@ check, matching its existing behavior.
 content never included). It 404s when the id has no revisions at all, the same "document not
 found" condition as the other lookups.
 
+## Soft Delete
+
+`Document.deleted` (boolean, default `false`) is a second, non-destructive deletion mechanism
+alongside the hard `DELETE /api/v1/document/{id}` described above. `DELETE
+/api/v1/document/{id}/soft` (`DocumentController.softDelete` → `DocumentServiceImpl.softDelete`)
+only flips this one field via a targeted Mongo update (`applyUpdate`, the same helper
+`updateStatus` uses) — the Mongo record, its full `DocumentRevision` history, and every version's
+MinIO content are all left untouched. Nothing about the ingestion pipeline or `DocumentStatus`
+changes either; `deleted` is a completely independent axis from `status`/`version`.
+
+The visible effect of a soft delete is entirely on the search side: once the flag is set, the
+document stops appearing in `/ask`, `/search`, and `/search/hybrid` results (see [Search &
+RAG](#search--rag)). That happens by riding the exact same mechanism as [Keeping Vector Store
+Metadata in Sync](#keeping-vector-store-metadata-in-sync) — `softDelete` publishes to the
+`document-metadata-sync` Kafka topic just like `mergeSummary`/`updateDocumentType`/`updateDocument`
+do, `DocumentIndexSyncConsumer` picks it up, and `DocumentIndexService.updateMetadata` merges the
+current `deleted` value into every one of the document's indexed chunks. There's no separate
+code path for the delete case; soft delete works by making sure `deleted` is one of the fields that
+sync keeps current, and making sure every search path filters on it.
+
+Two consequences follow directly from reusing that mechanism:
+
+- The exclusion is **asynchronous**, with the same eventual-consistency window as any other
+  metadata sync (typically milliseconds to a couple of seconds locally) — a search issued
+  immediately after `DELETE .../soft` returns `204` can still briefly include the document.
+- There's no API-level "undelete." Reversing a soft delete means directly flipping `deleted` back to
+  `false` in Mongo (which would need to publish to `document-metadata-sync` again to re-sync the
+  vector store) — nothing in `DocumentService`/`DocumentController` currently exposes that.
+
+`Document.authorisation` (nullable `String`) is a related, currently-inert field on the same model
+— reserved for a future document-level access-control code, but nothing reads or enforces it yet.
+
 ## Document Summarization & Classification
 
 Once indexing completes, two independent AI steps run concurrently, both grounded in the chunks
@@ -362,10 +394,11 @@ predates both the summary and the classification result — ends up reflecting t
 
 ## Keeping Vector Store Metadata in Sync
 
-Indexing captures `metadata`/`documentType` once, at indexing time. Everything that changes a
-`Document` afterward — the summary and classification merges above, or any future direct metadata
-edit — goes through the single `DocumentServiceImpl.update()` method, which now publishes the
-document's id to the `document-metadata-sync` Kafka topic right after saving to Mongo.
+Indexing captures `metadata`/`documentType`/`deleted` once, at indexing time (`deleted` is always
+`false` then, since a document can't be soft-deleted before it exists). Everything that changes a
+`Document` afterward — the summary and classification merges above, a soft delete, or any future
+direct metadata edit — goes through a `DocumentServiceImpl` method that publishes the document's id
+to the `document-metadata-sync` Kafka topic right after saving to Mongo.
 `DocumentIndexSyncConsumer` (`docman-api`) consumes that topic, re-fetches the current `DocumentDto`
 (rather than trusting the message payload, which could be stale by the time it's processed), and
 calls `DocumentIndexService.updateMetadata()` (`docman-service`), which delegates the actual merge
@@ -387,34 +420,42 @@ knowing:
 
 - It's a **merge, not a diff** — removing a key from the Mongo `metadata` map doesn't remove it from
   the chunk (only additions/overwrites propagate). Full deletion-aware sync would need to compare
-  old vs. new metadata, which isn't implemented.
+  old vs. new metadata, which isn't implemented. `deleted` is the one exception: it's always
+  included in the merged fields (a boolean has no "absent" state worth skipping the way a blank
+  `documentType` does), so every sync trigger — not just `softDelete` — keeps each chunk's `deleted`
+  flag current with Mongo's.
 - It's **eventually consistent, not synchronous** — `POST /api/v1/document/search` may briefly still return
-  the pre-update value for a `documentType`/metadata filter until the Kafka message is consumed
-  (typically milliseconds to a couple of seconds locally). `GET /api/v1/document/metadata/{id}` (reading
-  straight from Mongo) is always current.
-- It's triggered by `mergeSummary`/`updateDocumentType`/`updateDocument` — the calls that actually
-  change `metadata`/`documentType` — not by `updateStatus`, since a status transition alone never
-  affects chunk metadata. The first trigger for a given document is typically the summary merge,
-  by which point indexing has already written chunks for `update_by_query` to match; if it ever
-  fires before that, it's a harmless no-op logged at `info` level (`Synced metadata into 0 indexed
-  chunk(s)...`).
+  the pre-update value for a `documentType`/metadata filter, or still include a document just
+  soft-deleted, until the Kafka message is consumed (typically milliseconds to a couple of seconds
+  locally). `GET /api/v1/document/metadata/{id}` (reading straight from Mongo) is always current.
+- It's triggered by `mergeSummary`/`updateDocumentType`/`updateDocument`/`softDelete` — the calls
+  that actually change `metadata`/`documentType`/`deleted` — not by `updateStatus`, since a status
+  transition alone never affects chunk metadata. The first trigger for a given document is
+  typically the summary merge, by which point indexing has already written chunks for
+  `update_by_query` to match; if any trigger ever fires before that, it's a harmless no-op logged at
+  `info` level (`Synced metadata into 0 indexed chunk(s)...`).
 
 ## Search & RAG
 
-Three independent search paths exist over the same OpenSearch index (`docman-vector-index`):
+Three independent search paths exist over the same OpenSearch index (`docman-vector-index`), and
+all three unconditionally exclude soft-deleted documents (see [Soft
+Delete](#soft-delete) below) — a caller can't opt back into seeing them, since a `deleted` key in a
+request's `filters` map is dropped/overwritten rather than honored:
 
 - **`POST /api/v1/document/ask`** — vector similarity search + RAG. The question is embedded, the most
   relevant chunks are retrieved from OpenSearch, and `llama3.1` generates an answer grounded in
   that context (`QuestionAnswerAdvisor`). Runs on a bounded background executor
   (`askExecutor`, separate from Tomcat's request threads) since Ollama inference can take minutes
   on CPU-only hardware — the HTTP request uses Spring MVC's `DeferredResult` so the calling thread
-  isn't blocked for the duration.
+  isn't blocked for the duration. The advisor's base `SearchRequest` carries a `deleted == false`
+  filter expression, so retrieval never surfaces a soft-deleted chunk as RAG context in the first
+  place.
 - **`POST /api/v1/document/search`** — structured metadata search. Callers supply a map of field → value
   filters (e.g. `{"documentType": "invoice"}`); the query engine builds a `bool`/`match` query,
   prefixing every key with `metadata.` server-side. This means callers can never reach fields
   outside the `metadata` subtree (like raw `content` or the `embedding` vector) no matter what key
   they supply — the query is built from a fixed field-path template, not from arbitrary
-  client-supplied query syntax.
+  client-supplied query syntax. `deleted: false` is merged into the filter map before every request.
 - **`POST /api/v1/document/search/hybrid`** — hybrid search: the same free-text `query` drives two
   independent retrievals run in sequence — a vector similarity search via `VectorStore.similaritySearch`
   (embeddings from the active `EmbeddingModel`) and a BM25 `match` query against the chunk's raw
@@ -422,7 +463,8 @@ Three independent search paths exist over the same OpenSearch index (`docman-vec
   `filters` (same shape and 10-entry cap as `/search`) are applied as a hard AND constraint to
   *both* legs before ranking — a metadata `filterExpression` on the vector search, a non-scoring
   `filter` clause on the OpenSearch `bool` query — so an impossible filter zeroes out both engines
-  rather than silently falling back to unfiltered semantic matches. The two ranked lists (each
+  rather than silently falling back to unfiltered semantic matches. `deleted == false` is ANDed into
+  both legs the same way, always, regardless of caller-supplied `filters`. The two ranked lists (each
   capped at `QueryConstants.HYBRID_SEARCH_TOP_K`, 10) are fused with **Reciprocal Rank Fusion**:
   each hit contributes `1 / (60 + rank)` to its `parent_document_id`'s score (rank, not the engine's
   own similarity/BM25 score, since cosine similarity and BM25 aren't on comparable scales), summed

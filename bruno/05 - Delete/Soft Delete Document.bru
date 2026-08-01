@@ -1,0 +1,33 @@
+meta {
+  name: Soft Delete Document
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/document/{{documentId}}/soft
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+tests {
+  test("returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Marks the document deleted without removing anything - the Mongo record, revision
+  history, and MinIO content are all left in place. `deleted` flips to `true` immediately
+  in Mongo (see "Get Metadata - Latest" in `03 - Retrieve`), but the vector store's chunks
+  only pick it up asynchronously via the Kafka metadata-sync consumer, so `/ask`, `/search`,
+  and `/search/hybrid` may briefly still surface the document for a moment afterward.
+
+  Run this before "Delete Document" - the hard delete below removes the document entirely,
+  after which `{{documentId}}` no longer resolves to anything.
+}

@@ -46,6 +46,10 @@ without blocking the client that uploaded the document.
 - **Full lifecycle management**: presigned/direct download, metadata lookup, and delete (which tears
   down every version's MinIO object, the vector store entries, the Mongo record and its revision
   history, and cancels any still-running ingestion workflow for that document)
+- **Soft delete**: mark a document deleted without removing anything — the Mongo record, revision
+  history, and MinIO content all stay in place, and the `deleted` flag propagates to the indexed
+  chunks asynchronously via the same Kafka-triggered metadata sync, after which `/ask`, `/search`,
+  and `/search/hybrid` all stop surfacing it
 - **Kafka event notifications** for every stage of a document's ingestion lifecycle
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit together, and

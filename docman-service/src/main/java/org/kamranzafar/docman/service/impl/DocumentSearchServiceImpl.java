@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +57,17 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
     public String vectorSearch(String question) {
         log.info("Vector search with prompt '{}'", question);
 
+        // Base request carries only the deleted==false constraint - QuestionAnswerAdvisor
+        // merges its own query text into a copy of this at call time (see
+        // QuestionAnswerAdvisor#before), so the filter still applies per-question.
+        SearchRequest notDeletedRequest = SearchRequest.builder()
+                .filterExpression(notDeletedFilterExpression())
+                .build();
+
         ChatResponse response = chatClient.prompt()
                 .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(notDeletedRequest)
                         .promptTemplate(PromptGuardrails.QUESTION_ANSWER_TEMPLATE)
                         .build())
                 .user(question)
@@ -74,7 +83,7 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
 
     @Override
     public List<Object> lexicalSearch(Map<String, Object> filters) {
-        List<Object> documents = documentVectorStore.searchByMetadata(filters);
+        List<Object> documents = documentVectorStore.searchByMetadata(excludeDeleted(filters));
 
         if (documents.isEmpty()) {
             throw new DocumentNotFoundException("No matching document(s) found");
@@ -89,7 +98,7 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
 
         List<Document> semanticHits = semanticSearch(query, filters);
         List<Map<String, Object>> lexicalHits = documentVectorStore.searchByContent(
-                query, filters, QueryConstants.HYBRID_SEARCH_TOP_K);
+                query, excludeDeleted(filters), QueryConstants.HYBRID_SEARCH_TOP_K);
 
         // Reciprocal Rank Fusion: each leg contributes 1/(k+rank) per document (keyed by
         // parent_document_id, since both legs return chunk-level hits), regardless of the
@@ -140,28 +149,42 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
     private List<Document> semanticSearch(String query, Map<String, Object> filters) {
         SearchRequest.Builder requestBuilder = SearchRequest.builder()
                 .query(query)
-                .topK(QueryConstants.HYBRID_SEARCH_TOP_K);
-
-        Filter.Expression filterExpression = toFilterExpression(filters);
-        if (filterExpression != null) {
-            requestBuilder.filterExpression(filterExpression);
-        }
+                .topK(QueryConstants.HYBRID_SEARCH_TOP_K)
+                .filterExpression(toFilterExpression(filters));
 
         return vectorStore.similaritySearch(requestBuilder.build());
     }
 
+    // Always ANDs in deleted==false, on top of whatever caller-supplied metadata filters
+    // apply - a caller-supplied "deleted" key is dropped rather than honored, so the
+    // exclusion can never be overridden from the request.
     private Filter.Expression toFilterExpression(Map<String, Object> filters) {
-        if (filters == null || filters.isEmpty()) {
-            return null;
-        }
-
         FilterExpressionBuilder b = new FilterExpressionBuilder();
-        FilterExpressionBuilder.Op combined = null;
-        for (Map.Entry<String, Object> entry : filters.entrySet()) {
-            FilterExpressionBuilder.Op eq = b.eq(entry.getKey(), String.valueOf(entry.getValue()));
-            combined = combined == null ? eq : b.and(combined, eq);
+        FilterExpressionBuilder.Op combined = b.eq(QueryConstants.DELETED_METADATA_KEY, false);
+
+        if (filters != null) {
+            for (Map.Entry<String, Object> entry : filters.entrySet()) {
+                if (QueryConstants.DELETED_METADATA_KEY.equals(entry.getKey())) {
+                    continue;
+                }
+                FilterExpressionBuilder.Op eq = b.eq(entry.getKey(), String.valueOf(entry.getValue()));
+                combined = b.and(combined, eq);
+            }
         }
 
         return combined.build();
+    }
+
+    private Filter.Expression notDeletedFilterExpression() {
+        return new FilterExpressionBuilder().eq(QueryConstants.DELETED_METADATA_KEY, false).build();
+    }
+
+    // Forces deleted==false into the filter map used by DocumentVectorStore's raw
+    // OpenSearch queries (searchByMetadata/searchByContent), overwriting any
+    // caller-supplied "deleted" key so the exclusion can never be overridden.
+    private Map<String, Object> excludeDeleted(Map<String, Object> filters) {
+        Map<String, Object> merged = filters != null ? new HashMap<>(filters) : new HashMap<>();
+        merged.put(QueryConstants.DELETED_METADATA_KEY, false);
+        return merged;
     }
 }

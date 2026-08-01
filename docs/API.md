@@ -25,7 +25,9 @@ Every endpoint that returns a document uses this shape (`DocumentDto`):
   "createdBy": "alice",
   "updatedAt": "2026-07-24T05:01:43.877Z",
   "updatedBy": "alice",
-  "version": 1
+  "version": 1,
+  "deleted": false,
+  "authorisation": null
 }
 ```
 
@@ -47,6 +49,11 @@ optional, caller-supplied identifiers (e.g. a username), and are otherwise `null
 starts at `1` and only increments on a user-driven change via `PUT /api/v1/document/{id}` — see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#document-versioning--revision-history) for exactly what
 does and doesn't bump it.
+
+`deleted` is `true` once the document has been soft-deleted (see
+[`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document) below) —
+`false` for every document by default. `authorisation` is a reserved, nullable string field for a
+future document-level access-control code; nothing in the API currently reads or enforces it.
 
 ### Error responses
 
@@ -360,6 +367,10 @@ doesn't tie up a web server thread while waiting; the client still simply waits 
 response. If it takes longer than ~650 seconds the server returns `503 Service Unavailable` with a
 timeout message.
 
+Soft-deleted documents (see [`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document))
+are never used as RAG context — the retrieval step always excludes them, so the answer is grounded
+only in still-active documents.
+
 **Errors**: `400` if `question` is blank/missing, or longer than `QueryConstants.QUERY_MAX_QUESTION_LENGTH`
 (2000 characters).
 
@@ -394,6 +405,10 @@ sync with Mongo asynchronously via Kafka (see
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) — so it can lag the
 `GET /api/v1/document/metadata/{id}` value by up to a couple of seconds right after ingestion completes.
 
+Soft-deleted documents (see [`DELETE /api/v1/document/{id}/soft`](#delete-apiv1documentidsoft--soft-delete-a-document))
+are always excluded — the server forces a `deleted: false` constraint into every request,
+overwriting a `deleted` key in `filters` if one is supplied.
+
 **Response** `200 OK`: a list of matching chunks' metadata (one entry per indexed chunk, collapsed
 by parent document where possible):
 
@@ -405,14 +420,15 @@ by parent document where possible):
       "documentType": "invoice",
       "vendor": "acme",
       "parent_document_id": "a391f59e-f0fb-4d98-a36c-9f7706cebb8a",
-      "total_chunks": 3
+      "total_chunks": 3,
+      "deleted": false
     }
   }
 ]
 ```
 
 **Errors**: `400` if `filters` is missing/empty, or if it has more than 10 entries. `404` if
-nothing matches.
+nothing matches (including when every candidate has been soft-deleted).
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/search \
@@ -445,6 +461,10 @@ conceptual phrasing that a pure keyword search would miss.
 | `query`   | yes      | Free-text query driving both the vector search and the BM25 `content` match |
 | `filters` | no       | Same shape and rules as `/search`'s `filters` (max 10 entries) — applied as a hard AND constraint to **both** legs before fusion, not just the lexical one |
 
+Like `/search`, both legs also force a `deleted: false` constraint that can't be overridden by a
+caller-supplied `deleted` filter — soft-deleted documents never appear in either leg, so they can
+never win a fusion tie either.
+
 **Response** `200 OK`: a list of matching chunks' metadata with a fused RRF score, sorted
 descending, collapsed by parent document like `/search`:
 
@@ -456,7 +476,8 @@ descending, collapsed by parent document like `/search`:
       "documentType": "invoice",
       "vendor": "acme",
       "parent_document_id": "a391f59e-f0fb-4d98-a36c-9f7706cebb8a",
-      "total_chunks": 3
+      "total_chunks": 3,
+      "deleted": false
     },
     "score": 0.032786885245901644
   }
@@ -469,7 +490,7 @@ meaningful for ordering results within a single response.
 
 **Errors**: `400` if `query` is missing/blank, or if `filters` has more than 10 entries. `404` if
 nothing matches in either leg (e.g. `filters` eliminates every candidate from both the vector and
-lexical searches).
+lexical searches, or every candidate has been soft-deleted).
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/search/hybrid \
@@ -502,6 +523,39 @@ curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f
 
 ---
 
+## `DELETE /api/v1/document/{id}/soft` — soft-delete a document
+
+Marks a document deleted **without** removing anything: the Mongo record, its full revision
+history, its MinIO content (all versions), and its indexed OpenSearch chunks are all left in place.
+The only change is the `deleted` flag on the `Document` representation, which flips from `false` to
+`true`.
+
+That flag change is then propagated to the document's indexed chunks **asynchronously**, via the
+same Kafka-driven metadata sync used for summary/classification results (see
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) — so there's
+typically a small delay (milliseconds to a couple of seconds locally) between this call returning
+and `deleted: true` actually excluding the document from
+[`/ask`](#post-apiv1documentask--ask-a-question-rag),
+[`/search`](#post-apiv1documentsearch--structured-metadata-search), and
+[`/search/hybrid`](#post-apiv1documentsearchhybrid--hybrid-semantic--lexical-search).
+`GET /api/v1/document/metadata/{id}` (reading straight from Mongo) reflects the new `deleted` value
+immediately.
+
+There is currently no "undelete" endpoint — reversing a soft delete means flipping `deleted` back
+via a direct Mongo update, which isn't exposed over the API.
+
+**Path parameter**: `id` — the document UUID.
+
+**Response**: `204 No Content` on success.
+
+**Errors**: `404` if the id doesn't exist, `400` if it's not a valid UUID.
+
+```shell
+curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f7706cebb8a/soft"
+```
+
+---
+
 ## Endpoint summary
 
 | Method   | Path                                          | Purpose                                              |
@@ -513,10 +567,11 @@ curl -X DELETE "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f
 | `GET`    | `/api/v1/document/metadata/{id}[/{version}]`  | Fetch document metadata (latest or a specific version) |
 | `GET`    | `/api/v1/document/revisions/{id}`             | Fetch full revision history (metadata only, all versions) |
 | `GET`    | `/api/v1/document/content/{id}[/{version}]`   | Presigned download URL (latest or a specific version)  |
-| `POST`   | `/api/v1/document/ask`                        | RAG question answering                                 |
-| `POST`   | `/api/v1/document/search`                     | Structured metadata search                              |
-| `POST`   | `/api/v1/document/search/hybrid`              | Hybrid search (semantic + lexical, RRF-fused)           |
+| `POST`   | `/api/v1/document/ask`                        | RAG question answering (excludes soft-deleted documents) |
+| `POST`   | `/api/v1/document/search`                     | Structured metadata search (excludes soft-deleted documents) |
+| `POST`   | `/api/v1/document/search/hybrid`              | Hybrid search (semantic + lexical, RRF-fused; excludes soft-deleted documents) |
 | `DELETE` | `/api/v1/document/{id}`                       | Delete document, all versions (full cleanup)           |
+| `DELETE` | `/api/v1/document/{id}/soft`                  | Soft-delete: mark deleted, keep record/content/index    |
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/
 OpenSearch debug requests) is in the `bruno/` directory at the repository root.

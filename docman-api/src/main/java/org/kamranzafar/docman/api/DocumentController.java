@@ -274,6 +274,13 @@ public class DocumentController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/soft")
+    public ResponseEntity<?> softDelete(@PathVariable String id) {
+        documentService.softDelete(parseId(id));
+
+        return ResponseEntity.noContent().build();
+    }
+
     private UUID parseId(String id) {
         try {
             return UUID.fromString(id);
