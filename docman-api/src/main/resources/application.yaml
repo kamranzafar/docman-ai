@@ -20,6 +20,9 @@ spring:
     jackson:
       serialization:
         INDENT_OUTPUT: true
+  threads:
+    virtual:
+      enabled: true
   data:
     mongodb:
       host: localhost
