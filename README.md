@@ -52,6 +52,10 @@ without blocking the client that uploaded the document.
   `/ask`, `/search`, and `/search/hybrid` all stop surfacing it; restoring reverses the flag the
   same way and brings it back into search
 - **Kafka event notifications** for every stage of a document's ingestion lifecycle
+- **MCP server for AI agents**: a read-only subset of the search/retrieval operations (ask, search,
+  hybrid search, metadata/revisions lookup, download link) is also exposed as Model Context
+  Protocol tools at `/mcp`, on the same port as the REST API — no separate process needed to give
+  an agent access to the document store
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit together, and
 [`docs/API.md`](docs/API.md) for the full REST API reference.
@@ -68,9 +72,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how these pieces fit toge
 | Workflow orchestration      | Temporal                             |
 | Eventing                    | Kafka                                |
 | AI inference                | Spring AI, vendor-agnostic — Ollama by default (`llama3.1`, `nomic-embed-text`), OpenAI (`gpt-5.4-mini`, `text-embedding-3-small`) via the `prod` profile |
+| Agent access                 | MCP (Model Context Protocol) server, streamable HTTP at `/mcp` |
 | Build                        | Maven (multi-module)                |
 
-Full details, including how the five Maven modules divide responsibilities, are in
+Full details, including how the seven Maven modules divide responsibilities, are in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quick Start

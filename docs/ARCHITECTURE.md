@@ -11,6 +11,7 @@ path.
 ```mermaid
 flowchart LR
     Client -->|REST| API[docman-api]
+    Agent[AI agent] -->|MCP / streamable HTTP| API
     API -->|start workflow| Temporal[(Temporal)]
     API -->|CRUD| Mongo[(MongoDB)]
     API -->|presigned URL / stream| MinIO[(MinIO)]
@@ -22,6 +23,8 @@ flowchart LR
     DocmanService -->|chat + embeddings| Model[(Ollama / OpenAI)]
     Workflow -->|events| Kafka[(Kafka)]
 ```
+
+`docman-api` serves both the REST API and, via the `docman-mcp-server` module, an MCP endpoint at `/mcp` on the same port — an AI agent talks to the same underlying services (`DocumentSearchService`/`DocumentService`/`ObjectStoreService`) a REST client does, just over a different protocol and a narrower, read-only surface. See [MCP Server](#mcp-server) below.
 
 ## Tech Stack
 
@@ -39,10 +42,11 @@ flowchart LR
 | Document summarization            | Configured chat model + OpenSearch      | Generates a 2-3 sentence summary via retrieval over the document's own indexed chunks |
 | Document classification         | Configured chat model (temperature `0`) + OpenSearch | Assigns `documentType` from a fixed category set, via retrieval over the document's own indexed chunks |
 | DTO ↔ entity mapping              | MapStruct                          | Generates the `Document` ⇄ `DocumentDto`/`DocumentRequest` mappers at compile time |
+| Agent access                        | Spring AI MCP server (streamable HTTP) | Exposes six read-only search/retrieval tools to MCP clients at `/mcp`, on the same port as the REST API — see [MCP Server](#mcp-server) |
 
 ## Module Structure
 
-The project is a 5-module Maven reactor. Modules depend on each other in this order (each arrow
+The project is a 7-module Maven reactor. Modules depend on each other in this order (each arrow
 is a compile-time Maven dependency):
 
 ```mermaid
@@ -51,8 +55,12 @@ flowchart BT
     persistence --> service[docman-service]
     domain --> workflow[docman-workflow]
     service --> workflow
+    service --> vectorstore[docman-vector-opensearch]
+    service --> mcp[docman-mcp-server]
     service --> api[docman-api]
     workflow --> api
+    vectorstore --> api
+    mcp --> api
 ```
 
 | Module                | Contents                                                                                   |
@@ -61,10 +69,12 @@ flowchart BT
 | **docman-persistence**    | `DocumentMetadataRepository` and `DocumentRevisionRepository` — the Spring Data MongoDB repositories for `Document` and `DocumentRevision`      |
 | **docman-service**        | Service interfaces *and* implementations: `DocumentService` (create/update, version bumps + revision snapshots, also publishes the metadata-sync Kafka trigger), `ObjectStoreService` (version-scoped MinIO keys), `DocumentIndexService` (Tika + embeddings + OpenSearch; also the metadata-only vector store sync), `DocumentSearchService` (RAG + lexical search), `DocumentSummaryService` (RAG-based summarization over the vector store), `DocumentClassificationService` (RAG-based `documentType` classification over the vector store) |
 | **docman-workflow**        | The Temporal `DocumentWorkflow`/`DocumentActivities` definitions and implementations, and `DocumentWorkflowManager`, which starts/terminates a **version-scoped** workflow execution per document version |
+| **docman-vector-opensearch** | The sole implementation of `DocumentVectorStore` (`OpenSearchDocumentVectorStore`), plus the `OpenSearchClient`/OpenSearch `VectorStore` autoconfiguration — the only module with an OpenSearch dependency (see [Vector store: provider-agnostic by module boundary](#vector-store-provider-agnostic-by-module-boundary-not-just-config)) |
+| **docman-mcp-server**       | `DocumentMcpTools` (six read-only `@Tool` methods over `DocumentSearchService`/`DocumentService`/`ObjectStoreService`) and `McpToolConfiguration`, plus the Spring AI MCP server starter dependency — see [MCP Server](#mcp-server) |
 | **docman-api**              | The runnable Spring Boot application: `Application` (entry point), `DocumentController` (REST, including the update API and version-aware GETs), exception handling, Kafka/MinIO/executor configuration, `DocumentIndexSyncConsumer` (the metadata-sync Kafka listener) |
 
 Only **docman-api** produces an executable artifact (a Spring Boot fat jar via
-`spring-boot-maven-plugin`); the other four build plain library jars.
+`spring-boot-maven-plugin`); the other six build plain library jars.
 
 Note that `Document` (the Mongo entity, in `docman-domain`) never crosses the REST boundary —
 the controller and all service-layer method signatures use `DocumentDto` instead. The only place
@@ -540,6 +550,60 @@ Each indexed chunk's metadata includes the caller-supplied `metadata` map, plus 
 system adds automatically: `parent_document_id` (used to collapse/dedupe multiple chunks from the
 same document in search results) and `documentType`, kept up to date by the [vector store metadata
 sync](#keeping-vector-store-metadata-in-sync) described above.
+
+## MCP Server
+
+`docman-mcp-server` exposes a read-only subset of the same document/search operations to AI agents
+over the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), using Spring AI's MCP
+server support. It's a sibling module to `docman-vector-opensearch` in the same sense: it depends
+only on `docman-service`'s interfaces and contributes no code of its own to `docman-api` beyond
+putting itself on the classpath.
+
+`DocumentMcpTools` wraps existing services in six `@Tool`-annotated methods, applying the same
+validation `DocumentController` already does for the equivalent REST call:
+
+| Tool                     | Wraps                                          | Equivalent REST endpoint            |
+|---------------------------|-------------------------------------------------|----------------------------------------|
+| `askQuestion`              | `DocumentSearchService.vectorSearch`             | `POST /api/v1/document/ask`             |
+| `searchByMetadata`          | `DocumentSearchService.lexicalSearch`            | `POST /api/v1/document/search`          |
+| `hybridSearch`               | `DocumentSearchService.hybridSearch`             | `POST /api/v1/document/search/hybrid`   |
+| `getDocumentMetadata`         | `DocumentService.findMetadata`                   | `GET /api/v1/document/metadata/{id}`    |
+| `getDocumentRevisions`         | `DocumentService.findRevisions`                  | `GET /api/v1/document/revisions/{id}`   |
+| `getDocumentDownloadUrl`        | `ObjectStoreService.presignedDownloadUrl`        | `GET /api/v1/document/content/{id}`     |
+
+**Mutating operations (create/update/delete/soft-delete/restore) are deliberately not exposed as
+tools** — the agent-facing surface is read-only by design, since an agent invoking a tool
+unsupervised is a materially different trust boundary than a human calling the REST API directly.
+
+**Transport**: streamable HTTP (`spring.ai.mcp.server.protocol: STREAMABLE`), served at the default
+`/mcp` endpoint on the same Tomcat instance and port as the REST API (8081) — no separate process
+or port for an MCP client to reach. `spring.ai.mcp.server.name`/`.version`/`.instructions`
+(`application.yaml`) identify the server and summarize its tools to a connecting client.
+
+### Bean-wiring gotcha: `SyncToolSpecification`, not `ToolCallbackProvider`
+
+`McpToolConfiguration` registers `DocumentMcpTools`' tools as a
+`List<McpServerFeatures.SyncToolSpecification>` bean, not as a `ToolCallbackProvider`/`ToolCallback`
+bean, even though the latter is the more common pattern in Spring AI MCP server examples. This was a
+deliberate fix for a real startup failure hit during development, not a stylistic choice: a
+`ToolCallbackProvider` bean is *also* auto-discovered by Spring AI's `ToolCallingAutoConfiguration`
+— which wires the app's own internal RAG `ChatClient` (used by `DocumentSearchServiceImpl.vectorSearch`)
+— as a candidate tool for the LLM's *own* function-calling. Since `DocumentMcpTools` calls back into
+`DocumentSearchService`, the same service the internal `ChatClient` bean depends on, that produces a
+genuine circular bean dependency at startup:
+
+```
+documentSearchServiceImpl → chatClientBuilder → ollamaChatModel → toolCallingManager
+  → toolCallbackResolver → documentToolCallbackProvider → documentMcpTools
+  → documentSearchServiceImpl (cycle)
+```
+
+Building the `SyncToolSpecification` list directly (`McpToolUtils.toSyncToolSpecifications(...)`
+over `MethodToolCallbackProvider.builder().toolObjects(documentMcpTools).build().getToolCallbacks()`)
+feeds `McpServerAutoConfiguration`'s `mcpSyncServer` bean without ever registering a
+`ToolCallbackProvider`/`ToolCallback` bean in the context, so `ToolCallingAutoConfiguration` never
+sees these tools as candidates for the internal `ChatClient`. Worth remembering if a future tool
+object also depends on a service the app's own chat model wiring touches.
 
 ## Presigned URLs
 

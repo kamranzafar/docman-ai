@@ -82,3 +82,16 @@ spring:
         options:
           timeout: 600s
           temperature: 1
+    mcp:
+      server:
+        name: docman-mcp-server
+        version: 1.0.0
+        # Streamable HTTP transport, served on the same port as the REST API (8081) at
+        # the default /mcp endpoint - no separate process/port for MCP clients to reach.
+        protocol: STREAMABLE
+        instructions: >
+          Read-only tools over the docman document management system: ask natural-language
+          questions answered via RAG (askQuestion), search indexed document chunks by exact
+          metadata (searchByMetadata) or by free-text plus optional metadata filters
+          (hybridSearch), and fetch a specific document's metadata, revision history, or a
+          presigned download link by id.

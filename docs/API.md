@@ -4,6 +4,10 @@ Base URL: `http://localhost:8081` (default; see [`docs/SETUP.md`](SETUP.md#confi
 for how the port is configured). All endpoints are under `/api/v1/document`. There is no authentication —
 this is a reference implementation.
 
+This is the REST API reference. A read-only subset of these operations is also available to AI
+agents over MCP at `/mcp` on the same host/port — see [MCP tools](#mcp-tools) at the end of this
+document.
+
 ## Conventions
 
 ### Document representation
@@ -629,3 +633,25 @@ curl -X POST "http://localhost:8081/api/v1/document/a391f59e-f0fb-4d98-a36c-9f77
 
 A [Bruno](https://www.usebruno.com/) collection covering all of these (plus direct MinIO/Ollama/
 OpenSearch debug requests) is in the `bruno/` directory at the repository root.
+
+---
+
+## MCP tools
+
+For AI agents (rather than direct HTTP clients), a read-only subset of the operations above is also
+served over the [Model Context Protocol](https://modelcontextprotocol.io/) at `POST /mcp`
+(streamable-HTTP transport, same host/port as the REST API — no separate process). See
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#mcp-server) for the full design rationale, and
+[`docs/SETUP.md`](SETUP.md#mcp-server-agent-access) for how to connect a client (e.g. Claude Code)
+to it.
+
+| Tool                     | Equivalent REST endpoint                       |
+|---------------------------|--------------------------------------------------|
+| `askQuestion`              | [`POST /api/v1/document/ask`](#post-apiv1documentask--ask-a-question-rag) |
+| `searchByMetadata`          | [`POST /api/v1/document/search`](#post-apiv1documentsearch--structured-metadata-search) |
+| `hybridSearch`               | [`POST /api/v1/document/search/hybrid`](#post-apiv1documentsearchhybrid--hybrid-semantic--lexical-search) |
+| `getDocumentMetadata`         | [`GET /api/v1/document/metadata/{id}`](#get-apiv1documentmetadataid--fetch-a-documents-metadata) |
+| `getDocumentRevisions`         | [`GET /api/v1/document/revisions/{id}`](#get-apiv1documentrevisionsid--fetch-a-documents-full-revision-history) |
+| `getDocumentDownloadUrl`        | [`GET /api/v1/document/content/{id}`](#get-apiv1documentcontentid--get-a-presigned-download-url) |
+
+Create/update/delete/soft-delete/restore have no MCP tool equivalent — those remain REST-only.

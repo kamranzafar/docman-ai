@@ -21,6 +21,7 @@
         <module>docman-persistence</module>
         <module>docman-vector-opensearch</module>
         <module>docman-workflow</module>
+        <module>docman-mcp-server</module>
         <module>docman-api</module>
     </modules>
 

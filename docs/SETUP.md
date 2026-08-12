@@ -70,8 +70,9 @@ curl -sk -u admin:SecureP@ssword1 https://localhost:9200/_cluster/health
 
 ## 3. Build the project
 
-This is a 5-module Maven reactor (`docman-domain`, `docman-persistence`, `docman-service`,
-`docman-workflow`, `docman-api`). Build the whole thing from the repository root:
+This is a 7-module Maven reactor (`docman-domain`, `docman-persistence`, `docman-service`,
+`docman-vector-opensearch`, `docman-workflow`, `docman-mcp-server`, `docman-api`). Build the whole
+thing from the repository root:
 
 ```shell
 mvn clean package
@@ -146,6 +147,35 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `kafka.address`                                                                    | `localhost:9092`                  | Kafka bootstrap server |
 | `kafka.topic`                                                                        | `documents`                       | Lifecycle notification topic |
 | `kafka.metadata-sync-topic`                                                            | `document-metadata-sync`          | Trigger topic for syncing vector store chunk metadata on every `DocumentService.update()` (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) |
+| `spring.ai.mcp.server.name` / `.version`                                                  | `docman-mcp-server` / `1.0.0`      | Identifies the MCP server to connecting clients |
+| `spring.ai.mcp.server.protocol`                                                              | `STREAMABLE`                      | Streamable-HTTP transport, served at the default `/mcp` endpoint on the same port as the REST API (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#mcp-server)) |
+
+## MCP Server (agent access)
+
+`docman-mcp-server` exposes six read-only tools (`askQuestion`, `searchByMetadata`, `hybridSearch`,
+`getDocumentMetadata`, `getDocumentRevisions`, `getDocumentDownloadUrl`) to MCP clients at
+`http://localhost:8081/mcp` — see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#mcp-server) for the tool
+surface and design rationale. No separate process or port is needed; it's served by the same
+Spring Boot app as the REST API, once the app is running (steps 1-4 above).
+
+To connect Claude Code to a locally running instance:
+
+```shell
+claude mcp add --transport http docman-ai http://localhost:8081/mcp --scope local
+```
+
+Then start a **new** Claude Code session in this project — MCP servers are loaded at session start,
+so a server added while a session is already running won't appear in that session's tools until it's
+restarted. Verify the connection and tool list with:
+
+```shell
+claude mcp list
+claude mcp get docman-ai
+```
+
+Any other MCP client (e.g. the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector),
+`npx @modelcontextprotocol/inspector`) works the same way against the same URL, using the
+streamable-HTTP transport.
 
 ## Production profile (OpenAI)
 
@@ -243,3 +273,14 @@ by this profile — only the model provider and vector index change.
   calls. If you see this error again after changing HTTP client dependencies, check that this bean
   is still being picked up (Spring AI's model autoconfigurations use whatever `RestClient.Builder`
   bean is in context, see the comment on that bean for more detail).
+- **App fails to start with a `BeanCurrentlyInCreationException`/circular-reference error
+  mentioning `documentSearchServiceImpl`, `chatClientBuilder`, `toolCallbackResolver`, and a tool
+  bean from `docman-mcp-server`**: this means a new MCP tool object (or a change to
+  `McpToolConfiguration`) started registering tools as a `ToolCallbackProvider`/`ToolCallback`
+  bean instead of a `List<McpServerFeatures.SyncToolSpecification>` bean. See [the bean-wiring
+  gotcha in `docs/ARCHITECTURE.md`](ARCHITECTURE.md#bean-wiring-gotcha-synctoolspecification-not-toolcallbackprovider)
+  for why that specific bean type matters here.
+- **A locally running `docman-ai` MCP server shows `claude mcp list` as `✔ Connected` but its
+  tools don't show up in Claude Code**: MCP servers are loaded when a Claude Code session starts,
+  not hot-reloaded into an already-running session. Start a new session after running `claude mcp
+  add` (see [MCP Server (agent access)](#mcp-server-agent-access) above).
