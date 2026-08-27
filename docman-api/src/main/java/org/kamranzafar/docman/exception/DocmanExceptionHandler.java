@@ -17,6 +17,7 @@
 
 package org.kamranzafar.docman.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -26,11 +27,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.util.UUID;
+
+@Slf4j
 @RestControllerAdvice
 public class DocmanExceptionHandler extends ResponseEntityExceptionHandler {
+    // Unhandled exceptions carry infrastructure detail (MinIO/OpenSearch/Mongo/model-provider
+    // messages, hostnames, fault bodies) that must not reach the client (OWASP LLM02:
+    // Sensitive Information Disclosure). Log the full exception under a short reference id
+    // and return only that id to the caller. The DocmanException / DocumentNotFoundException
+    // / DocumentConflictException handlers below still echo their curated, developer-authored
+    // messages.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleServerErrors(Exception ex, WebRequest request) {
-        return buildResponse(ex, HttpStatus.INTERNAL_SERVER_ERROR, request);
+        String reference = UUID.randomUUID().toString();
+        log.error("Unhandled server error [ref={}]", reference, ex);
+        ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred. Reference: " + reference);
+        return super.handleExceptionInternal(ex, body, new HttpHeaders(),
+                HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(DocmanException.class)

@@ -24,8 +24,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class DocmanConfig {
@@ -64,8 +66,12 @@ public class DocmanConfig {
 
     // Bounded and separate from Tomcat's request-handling pool, so slow chat-model
     // calls (which can take minutes on CPU-only local inference) don't exhaust it.
+    // The queue is bounded and the rejection policy aborts (OWASP LLM10: Unbounded
+    // Consumption) - once 10 in-flight + 20 queued LLM calls are outstanding, further
+    // /ask requests are shed with 503 rather than accumulating unboundedly.
     @Bean
     public Executor askExecutor() {
-        return Executors.newFixedThreadPool(10);
+        return new ThreadPoolExecutor(10, 10, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(20), new ThreadPoolExecutor.AbortPolicy());
     }
 }

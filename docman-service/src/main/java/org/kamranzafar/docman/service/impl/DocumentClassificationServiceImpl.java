@@ -98,7 +98,11 @@ public class DocumentClassificationServiceImpl implements DocumentClassification
                         .searchRequest(SearchRequest.builder().filterExpression(documentFilter).build())
                         .promptTemplate(PromptGuardrails.QUESTION_ANSWER_TEMPLATE)
                         .build())
-                .options(ChatOptions.builder().temperature(CLASSIFICATION_TEMPERATURE).build())
+                .options(ChatOptions.builder()
+                        .temperature(CLASSIFICATION_TEMPERATURE)
+                        // One short category label is all this call ever needs back (OWASP LLM10).
+                        .maxTokens(QueryConstants.CLASSIFICATION_MAX_RESPONSE_TOKENS)
+                        .build())
                 .user(String.format(CLASSIFICATION_QUESTION, categories))
                 .call()
                 .content();

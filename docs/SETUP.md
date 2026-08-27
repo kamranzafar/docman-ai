@@ -149,6 +149,8 @@ All configuration lives in `docman-api/src/main/resources/application.yaml`. Key
 | `kafka.metadata-sync-topic`                                                            | `document-metadata-sync`          | Trigger topic for syncing vector store chunk metadata on every `DocumentService.update()` (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#keeping-vector-store-metadata-in-sync)) |
 | `spring.ai.mcp.server.name` / `.version`                                                  | `docman-mcp-server` / `1.0.0`      | Identifies the MCP server to connecting clients |
 | `spring.ai.mcp.server.protocol`                                                              | `STREAMABLE`                      | Streamable-HTTP transport, served at the default `/mcp` endpoint on the same port as the REST API (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#mcp-server)) |
+| `docman.ratelimit.enabled`                                                                     | `true`                            | Per-client-IP token-bucket rate limit on `/ask`, `/search`, `/search/hybrid`, and `/mcp` (OWASP LLM10 — see [`docs/AI-SECURITY.md`](AI-SECURITY.md)) |
+| `docman.ratelimit.capacity` / `.refill-tokens` / `.refill-period`                              | `20` / `20` / `1m`                | Bucket size and greedy refill rate per IP; over-limit requests get `429` + `Retry-After` |
 
 ## MCP Server (agent access)
 
