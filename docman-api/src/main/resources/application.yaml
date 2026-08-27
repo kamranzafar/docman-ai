@@ -14,6 +14,14 @@ kafka:
   topic: documents
   metadata-sync-topic: document-metadata-sync
   message-retention: 86400000
+docman:
+  # Per-client-IP token-bucket rate limit applied to the cost-bearing endpoints
+  # (/api/v1/document/ask, /search, /search/hybrid, and /mcp) - OWASP LLM10.
+  ratelimit:
+    enabled: true
+    capacity: 20
+    refill-tokens: 20
+    refill-period: 1m
 spring:
   main:
     allow-bean-definition-overriding: true

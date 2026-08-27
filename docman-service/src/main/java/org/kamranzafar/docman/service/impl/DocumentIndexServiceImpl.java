@@ -69,6 +69,16 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
             assert ragDoc.getMedia() != null;
             assert ragDoc.getText() != null;
 
+            // Cap the text that gets chunked and embedded (OWASP LLM10: Unbounded
+            // Consumption) - multipart upload is already capped at 100MB, but a 100MB
+            // text file would still produce an enormous number of embedding calls.
+            String extractedText = ragDoc.getText();
+            if (extractedText.length() > QueryConstants.INDEX_MAX_CONTENT_CHARS) {
+                log.warn("Document {} extracted text is {} chars, truncating to {} before indexing",
+                        document.getId(), extractedText.length(), QueryConstants.INDEX_MAX_CONTENT_CHARS);
+                extractedText = extractedText.substring(0, QueryConstants.INDEX_MAX_CONTENT_CHARS);
+            }
+
             Map<String, Object> indexedMetadata = document.getMetadata() != null
                     ? new HashMap<>(document.getMetadata()) : new HashMap<>();
             if (StringUtils.hasText(document.getDocumentType())) {
@@ -78,7 +88,7 @@ public class DocumentIndexServiceImpl implements DocumentIndexService {
 
             org.springframework.ai.document.Document d
                     = new org.springframework.ai.document.Document(
-                    document.getId().toString(), ragDoc.getText(), indexedMetadata);
+                    document.getId().toString(), extractedText, indexedMetadata);
 
             List<org.springframework.ai.document.Document> splitDocuments = textSplitter.apply(List.of(d));
 

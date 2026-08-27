@@ -63,7 +63,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
         } catch (ErrorResponseException e) {
             return false;
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store statObject failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to check document content", e);
         }
     }
 
@@ -77,7 +78,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
                     .stream(content, size, -1)
                     .build());
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store putObject failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to store document content", e);
         }
     }
 
@@ -108,7 +110,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
                 log.warn("Failed to delete object {}: {}", error.objectName(), error.message());
             }
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store removeObjects failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to delete document content", e);
         }
     }
 
@@ -121,7 +124,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
                             .object(objectKey(document))
                             .build()));
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store getObject failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to retrieve document content", e);
         }
     }
 
@@ -140,7 +144,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
                             .extraQueryParams(reqParams)
                             .build());
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store presigned download URL failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to generate download URL", e);
         }
     }
 
@@ -155,7 +160,8 @@ public class ObjectStoreServiceImpl implements ObjectStoreService {
                             .expiry(minioUploadExpiry)
                             .build());
         } catch (Throwable e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Object store presigned upload URL failed for document {}", document.getId(), e);
+            throw new DocmanException("Failed to generate upload URL", e);
         }
     }
 
