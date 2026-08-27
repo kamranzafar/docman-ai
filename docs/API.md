@@ -81,7 +81,9 @@ body:
 | 400    | Validation failure (missing/blank required field, malformed UUID, empty search filters, too many filters, missing question, question too long, missing hybrid search query) |
 | 404    | Document id doesn't exist |
 | 409    | An update (`POST`/`PUT /api/v1/document/{id}`) lost an optimistic-concurrency race against another concurrent update to the same document — reload and retry |
-| 500    | Unhandled server error |
+| 429    | Per-client-IP rate limit exceeded on a cost-bearing endpoint (`/ask`, `/search`, `/search/hybrid`, `/mcp`) — default 20 requests/minute/IP. Response carries a `Retry-After` header (seconds). Configurable via `docman.ratelimit.*` |
+| 500    | Unhandled server error. The `detail` is a generic message with a reference id (`An unexpected error occurred. Reference: <id>`); the full error is in the server logs under that id |
+| 503    | `POST /api/v1/document/ask` only — the bounded question-answering executor is saturated (10 in-flight + 20 queued). Retry shortly. Also returned on the ~650 s answer timeout |
 
 ---
 
@@ -378,7 +380,8 @@ are never used as RAG context — the retrieval step always excludes them, so th
 only in still-active documents.
 
 **Errors**: `400` if `question` is blank/missing, or longer than `QueryConstants.QUERY_MAX_QUESTION_LENGTH`
-(2000 characters).
+(2000 characters). `429` if the per-IP rate limit is exceeded (`Retry-After` header). `503` if the
+question-answering executor is saturated or the ~650 s timeout elapses.
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/ask \
@@ -386,8 +389,9 @@ curl -X POST http://localhost:8081/api/v1/document/ask \
   -d '{"question":"What does the invoice from acme cover?"}'
 ```
 
-See [Prompt-injection mitigations](ARCHITECTURE.md#prompt-injection-mitigations) for how the
-question and the retrieved document context are handled before reaching the chat model.
+See [`docs/AI-SECURITY.md`](AI-SECURITY.md) for how the question and the retrieved document context
+are handled before reaching the chat model, and for the rate limit and consumption caps on this
+endpoint.
 
 ---
 
@@ -434,7 +438,8 @@ by parent document where possible):
 ```
 
 **Errors**: `400` if `filters` is missing/empty, or if it has more than 10 entries. `404` if
-nothing matches (including when every candidate has been soft-deleted).
+nothing matches (including when every candidate has been soft-deleted). `429` if the per-IP rate
+limit is exceeded (`Retry-After` header).
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/search \
@@ -496,7 +501,8 @@ meaningful for ordering results within a single response.
 
 **Errors**: `400` if `query` is missing/blank, or if `filters` has more than 10 entries. `404` if
 nothing matches in either leg (e.g. `filters` eliminates every candidate from both the vector and
-lexical searches, or every candidate has been soft-deleted).
+lexical searches, or every candidate has been soft-deleted). `429` if the per-IP rate limit is
+exceeded (`Retry-After` header).
 
 ```shell
 curl -X POST http://localhost:8081/api/v1/document/search/hybrid \
@@ -655,3 +661,6 @@ to it.
 | `getDocumentDownloadUrl`        | [`GET /api/v1/document/content/{id}`](#get-apiv1documentcontentid--get-a-presigned-download-url) |
 
 Create/update/delete/soft-delete/restore have no MCP tool equivalent — those remain REST-only.
+
+The `/mcp` endpoint is covered by the same per-client-IP [rate limit](#error-responses) as the
+cost-bearing REST endpoints (default 20 requests/minute/IP, `docman.ratelimit.*`).

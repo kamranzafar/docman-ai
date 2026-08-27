@@ -29,6 +29,23 @@ public interface QueryConstants {
     // otherwise goes straight into an LLM prompt.
     int QUERY_MAX_QUESTION_LENGTH = 2000;
     String CONTENT_FIELD = "content";
+
+    // --- LLM consumption limits (OWASP LLM10: Unbounded Consumption) ---
+    // Output-token ceilings passed to the chat model so a crafted prompt/context can't
+    // drive an arbitrarily long (and costly) completion.
+    int LLM_MAX_RESPONSE_TOKENS = 1024;
+    // Classification only ever needs one short category label back.
+    int CLASSIFICATION_MAX_RESPONSE_TOKENS = 16;
+    // Caps the concatenated chunk text fed into the summarization prompt - a very large
+    // document would otherwise produce a huge prompt regardless of the chunk count.
+    int SUMMARY_MAX_INPUT_CHARS = 24_000;
+    // Caps the summary text persisted back into document/chunk metadata, so an injection
+    // in the source document can't stuff arbitrary bulk text into stored metadata.
+    int SUMMARY_MAX_OUTPUT_CHARS = 2_000;
+    // Caps the extracted document text that gets chunked and embedded at indexing time,
+    // bounding embedding cost per upload.
+    int INDEX_MAX_CONTENT_CHARS = 500_000;
+
     int HYBRID_SEARCH_TOP_K = 10;
     // Reciprocal Rank Fusion constant - dampens the influence of low-ranked hits from
     // either leg so one engine returning a huge, loosely-relevant result set can't drown

@@ -18,6 +18,7 @@
 package org.kamranzafar.docman.api;
 
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.kamranzafar.docman.exception.DocmanException;
 import org.kamranzafar.docman.exception.DocumentNotFoundException;
 import org.kamranzafar.docman.model.*;
@@ -41,7 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/document")
 public class DocumentController {
@@ -91,7 +94,8 @@ public class DocumentController {
         try {
             objectStoreService.saveDocumentContent(document, file.getInputStream(), file.getSize());
         } catch (IOException e) {
-            throw new DocmanException(e.getMessage(), e);
+            log.error("Failed to read uploaded file for document {}", document.getId(), e);
+            throw new DocmanException("Failed to read uploaded file", e);
         }
 
         DocumentResponse documentResponse = new DocumentResponse();
@@ -129,7 +133,8 @@ public class DocumentController {
             try {
                 objectStoreService.saveDocumentContent(document, file.getInputStream(), file.getSize());
             } catch (IOException e) {
-                throw new DocmanException(e.getMessage(), e);
+                log.error("Failed to read uploaded file for document {}", document.getId(), e);
+                throw new DocmanException("Failed to read uploaded file", e);
             }
             documentWorkflowManager.createWorkflow(document);
         }
@@ -182,15 +187,23 @@ public class DocumentController {
         deferredResult.onTimeout(() -> deferredResult.setErrorResult(
                 ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("Question answering timed out")));
 
-        askExecutor.execute(() -> {
-            try {
-                DocumentSearchResponse response = DocumentSearchResponse.builder().build();
-                response.setAnswer(documentSearchService.vectorSearch(request.getQuestion()));
-                deferredResult.setResult(ResponseEntity.ok(response));
-            } catch (RuntimeException e) {
-                deferredResult.setErrorResult(e);
-            }
-        });
+        try {
+            askExecutor.execute(() -> {
+                try {
+                    DocumentSearchResponse response = DocumentSearchResponse.builder().build();
+                    response.setAnswer(documentSearchService.vectorSearch(request.getQuestion()));
+                    deferredResult.setResult(ResponseEntity.ok(response));
+                } catch (RuntimeException e) {
+                    deferredResult.setErrorResult(e);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // Bounded executor queue is full (OWASP LLM10) - shed load rather than pile up
+            // more pending LLM calls.
+            log.warn("Rejected /ask request - question answering executor is saturated");
+            deferredResult.setErrorResult(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Question answering is at capacity, retry shortly"));
+        }
 
         return deferredResult;
     }
