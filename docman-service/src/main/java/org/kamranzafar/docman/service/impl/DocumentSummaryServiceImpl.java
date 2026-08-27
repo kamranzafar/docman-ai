@@ -21,6 +21,7 @@ import org.kamranzafar.docman.model.DocumentDto;
 import org.kamranzafar.docman.model.QueryConstants;
 import org.kamranzafar.docman.service.DocumentSummaryService;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
@@ -93,15 +94,33 @@ public class DocumentSummaryServiceImpl implements DocumentSummaryService {
                 .map(org.springframework.ai.document.Document::getText)
                 .collect(Collectors.joining("\n"));
 
+        // Cap the prompt input regardless of chunk count (OWASP LLM10): a very large
+        // document would otherwise build an unboundedly large prompt.
+        if (text.length() > QueryConstants.SUMMARY_MAX_INPUT_CHARS) {
+            log.warn("Document {} text is {} chars, truncating to {} for summarization",
+                    document.getId(), text.length(), QueryConstants.SUMMARY_MAX_INPUT_CHARS);
+            text = text.substring(0, QueryConstants.SUMMARY_MAX_INPUT_CHARS);
+        }
+
         log.info("Generating summary for document {}", document.getId());
 
         String summary = chatClient.prompt()
                 .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
+                .options(ChatOptions.builder().maxTokens(QueryConstants.LLM_MAX_RESPONSE_TOKENS).build())
                 .user(String.format(SUMMARY_PROMPT, text))
                 .call()
                 .content();
 
         log.info("Generated summary for document {}", document.getId());
+
+        // Output-side bound (OWASP LLM05/LLM01): this text is persisted into document and
+        // chunk metadata and echoed back in DTOs - don't let an injected instruction make
+        // it arbitrarily large even if the model complies.
+        if (summary != null && summary.length() > QueryConstants.SUMMARY_MAX_OUTPUT_CHARS) {
+            log.warn("Summary for document {} is {} chars, truncating to {}",
+                    document.getId(), summary.length(), QueryConstants.SUMMARY_MAX_OUTPUT_CHARS);
+            summary = summary.substring(0, QueryConstants.SUMMARY_MAX_OUTPUT_CHARS);
+        }
 
         return summary;
     }

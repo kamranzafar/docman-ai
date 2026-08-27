@@ -25,6 +25,7 @@ import org.kamranzafar.docman.service.DocumentVectorStore;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -66,6 +67,9 @@ public class DocumentSearchServiceImpl implements DocumentSearchService {
 
         ChatResponse response = chatClient.prompt()
                 .system(PromptGuardrails.SYSTEM_INSTRUCTIONS)
+                // Bound the completion length (OWASP LLM10) - a prompt-injected context
+                // otherwise has no ceiling on how many tokens it can make the model emit.
+                .options(ChatOptions.builder().maxTokens(QueryConstants.LLM_MAX_RESPONSE_TOKENS).build())
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(notDeletedRequest)
                         .promptTemplate(PromptGuardrails.QUESTION_ANSWER_TEMPLATE)

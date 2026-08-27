@@ -52,6 +52,10 @@ without blocking the client that uploaded the document.
   `/ask`, `/search`, and `/search/hybrid` all stop surfacing it; restoring reverses the flag the
   same way and brings it back into search
 - **Kafka event notifications** for every stage of a document's ingestion lifecycle
+- **AI security controls**: prompt-injection mitigations on every LLM call, a per-client-IP rate
+  limit and output-token/input-size caps on the model endpoints, and generic error responses that
+  don't leak infrastructure detail — reviewed against the OWASP LLM Top 10 in
+  [`docs/AI-SECURITY.md`](docs/AI-SECURITY.md)
 - **MCP server for AI agents**: a read-only subset of the search/retrieval operations (ask, search,
   hybrid search, metadata/revisions lookup, download link) is also exposed as Model Context
   Protocol tools at `/mcp`, on the same port as the REST API — no separate process needed to give
@@ -115,6 +119,8 @@ plus example requests against MinIO, Ollama, and OpenSearch directly for debuggi
 - [`docs/SETUP.md`](docs/SETUP.md) — prerequisites, local setup, configuration reference, and
   deployment notes
 - [`docs/API.md`](docs/API.md) — REST API reference with request/response examples
+- [`docs/AI-SECURITY.md`](docs/AI-SECURITY.md) — OWASP LLM Top 10 review: prompt-injection
+  mitigations, rate limiting and consumption caps, and the accepted limitations
 
 ## License
 
