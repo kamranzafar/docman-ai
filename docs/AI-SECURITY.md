@@ -8,6 +8,10 @@ This is a reference implementation, not a hardened product. The controls below a
 measures, not guarantees — in particular, none of them replace authentication and authorization,
 which this project does not have (see [Accepted limitations](#accepted-limitations)).
 
+For the same controls and gaps framed against the NIST AI Risk Management Framework and its
+Generative AI Profile (Govern / Map / Measure / Manage), see
+[`docs/NIST-AI-RMF.md`](NIST-AI-RMF.md).
+
 ## Summary
 
 | # | Risk | Status | Implementation details |

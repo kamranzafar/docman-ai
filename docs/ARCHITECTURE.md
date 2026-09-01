@@ -498,7 +498,8 @@ disclosure handling, the per-IP rate limit and consumption caps, and the deliber
 (no authN/authZ, no vector-store tenant isolation) — has its own document:
 **[`docs/AI-SECURITY.md`](AI-SECURITY.md)**. It maps each
 [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/) risk to its status
-in this codebase.
+in this codebase. [`docs/NIST-AI-RMF.md`](NIST-AI-RMF.md) frames the same controls and gaps against
+the NIST AI RMF Generative AI Profile.
 
 ### Vector store: provider-agnostic by module boundary, not just config
 

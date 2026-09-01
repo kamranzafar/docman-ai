@@ -121,6 +121,8 @@ plus example requests against MinIO, Ollama, and OpenSearch directly for debuggi
 - [`docs/API.md`](docs/API.md) — REST API reference with request/response examples
 - [`docs/AI-SECURITY.md`](docs/AI-SECURITY.md) — OWASP LLM Top 10 review: prompt-injection
   mitigations, rate limiting and consumption caps, and the accepted limitations
+- [`docs/NIST-AI-RMF.md`](docs/NIST-AI-RMF.md) — NIST AI RMF Generative AI Profile: the same
+  controls and gaps placed inside the Govern / Map / Measure / Manage functions
 
 ## License
 
