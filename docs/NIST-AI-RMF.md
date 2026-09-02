@@ -9,7 +9,8 @@ It is a companion to [`docs/AI-SECURITY.md`](AI-SECURITY.md): that document maps
 [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) to concrete controls in
 the codebase; this one places those same controls (and the gaps around them) inside the RMF's
 **Govern / Map / Measure / Manage** structure and the twelve generative-AI risks called out in AI
-600-1.
+600-1. The [GfAA appendix](#appendix--guidance-for-ai-adoption-gfaa) cross-references the Australian
+*Guidance for AI Adoption* six-practice model against the same material.
 
 ## Scope and honesty caveat
 
@@ -175,12 +176,56 @@ also RMF gaps (chiefly under *Govern*, *Map 5*, and *Measure 2.10*):
 - **No content moderation** — `spring.ai.model.moderation` is `none`; provider-side moderation (if
   any) is the only filter on dangerous/abusive content.
 
+## Appendix — Guidance for AI Adoption (GfAA)
+
+[Guidance for AI Adoption](https://www.ai.gov.au/staying-safe-and-responsible/essential-ai-practices/guidance-ai-adoption-implementation-guidance)
+(GfAA) is the Australian Government / National AI Centre's responsible-AI guidance (October 2025).
+It is **non-binding** and only carries regulatory relevance for an operator in the Australian
+market; it is included here because it self-aligns with the NIST AI RMF and [ISO/IEC 42001], so it
+doubles as a lighter, more prescriptive scorecard over the same ground the rest of this document
+covers.
+
+It comes in two versions — *Foundations* (entry level) and *Implementation Guidance* (detailed) —
+addressed to both developers and deployers, and organised around six essential practices ("AI6").
+None of the six introduces a technical control beyond those already tracked under
+[Measure](#measure) and [Accepted limitations](#accepted-limitations) — they map almost
+one-to-one onto the RMF functions:
+
+| GfAA practice | Requires | Maps to (this doc) | Docman AI status |
+|---|---|---|---|
+| **1. Decide who is accountable** | Named executive owner; documented decision rights for approval / operation / monitoring | GOVERN 1.2, 2.1 | Adopter responsibility — artefact not created |
+| **2. Understand impacts and plan accordingly** | Identify affected stakeholders and harms (privacy, safety, fairness, security, employment, reputation); **assign a risk level**; plan mitigations | MAP 1.1, 5.1; the AI system impact assessment | Partial — the [GAI risk table](#generative-ai-risks-nist-ai-600-1) is a first-pass impact map; no formal risk-tier assigned |
+| **3. Measure and manage risks** | Fold AI risk into the existing enterprise risk register (privacy, cyber, WHS, consumer law); state risk appetite; document controls | GOVERN 1.3, 1.4; MANAGE 1.x | Partial — this document + [`AI-SECURITY.md`](AI-SECURITY.md) are the register; no risk-appetite statement |
+| **4. Share essential information** | Disclose AI use to affected parties; maintain an **AI system register** (purpose, controls); transparency with suppliers/partners | GOVERN 1.6; MAP 4.x; GAI risk 7 | Not done — no "AI-generated" disclosure on `/ask` answers or stored `summary`; no register |
+| **5. Test and monitor** | Pre-deployment testing for accuracy, robustness, bias, security; ongoing monitoring with incident thresholds and escalation | The whole [Measure](#measure) function | Weakest area — nothing implemented (see [Measure build-out](#measure)) |
+| **6. Maintain human control** | Human decision authority in high-stakes use; staff training + override; customer appeal mechanism | GOVERN 3.2; GAI risk 7 | Partial by design — read-only MCP surface, advisory-only `summary`/`documentType`, nothing auto-destructive; no formal override/appeal path |
+
+**What GfAA adds that is worth adopting regardless of jurisdiction:**
+
+1. **An explicit risk-level classification (practice 2).** The RMF weighs likelihood × magnitude
+   but does not force a verdict. Under GfAA, Docman AI as it stands — PII-capable document corpus,
+   no authN/authz, no tenant isolation — lands at *elevated* risk, which then sets the expected
+   rigour for practices 3–6.
+2. **An AI system register (practice 4).** One row per deployment configuration (default Ollama,
+   `prod` OpenAI): purpose, data classes handled, controls in place, accountable owner. Small
+   artefact; also satisfies RMF GOVERN 1.6.
+3. **User-facing disclosure (practices 4 and 6).** Flag AI-generated content wherever a person
+   consumes it — the `/ask` response body and the stored `metadata.summary` — and provide a
+   correction/override path (already possible mechanically via `PUT /api/v1/document/{id}`, but not
+   surfaced as an appeal mechanism).
+
+The implementation backlog is unchanged — GfAA is a second scorecard to check the
+[Measure build-out](#measure) and [Accepted limitations](#accepted-limitations) against, not
+additional work.
+
 ## References
 
 - [NIST AI 100-1 — AI Risk Management Framework 1.0](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)
 - [NIST AI 600-1 — Generative AI Profile](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf)
 - [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/) — see
   [`docs/AI-SECURITY.md`](AI-SECURITY.md)
+- [Guidance for AI Adoption (GfAA)](https://www.ai.gov.au/staying-safe-and-responsible/essential-ai-practices/guidance-ai-adoption-implementation-guidance)
+  — Australian Government / National AI Centre, October 2025
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — system design the controls above attach to
 - [ISO/IEC 42001] AI management systems, [ISO/IEC 23894] AI risk management, [ISO/IEC 42005] AI
   system impact assessment — complementary standards an adopter may certify against
@@ -188,5 +233,3 @@ also RMF gaps (chiefly under *Govern*, *Map 5*, and *Measure 2.10*):
 [ISO/IEC 42001]: https://www.iso.org/standard/81230.html
 [ISO/IEC 23894]: https://www.iso.org/standard/77304.html
 [ISO/IEC 42005]: https://www.iso.org/standard/44545.html
-</content>
-</invoke>
